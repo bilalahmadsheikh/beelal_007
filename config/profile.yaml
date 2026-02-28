@@ -1,0 +1,71 @@
+# BilalAgent v2.0 — User Profile
+# Source: CLAUDE.md + GitHub
+
+personal:
+  name: "Bilal Ahmad Sheikh"
+  github: "bilalahmadsheikh"
+  github_url: "https://github.com/bilalahmadsheikh"
+  degree: "AI Engineering, 3rd Year (6th Semester)"
+  location: "Pakistan"
+  skills:
+    - Python
+    - FastAPI
+    - Web3.py
+    - Blockchain
+    - MLOps
+    - Scikit-Learn
+    - XGBoost
+    - MLflow
+    - Docker
+    - PostgreSQL
+    - Supabase
+    - Geospatial
+    - AsyncIO
+
+projects:
+  - name: "basepy-sdk"
+    description: "Python SDK for Base L2 blockchain with 40% performance improvement over Web3.py"
+    tech_stack:
+      - Python
+      - Web3.py
+      - Blockchain
+      - AsyncIO
+    highlight: "40% performance improvement over Web3.py"
+
+  - name: "WhatsApp AI Chatbot"
+    description: "FastAPI + Supabase chatbot deployed on Railway for Pakistani SME market"
+    tech_stack:
+      - FastAPI
+      - Supabase
+      - Railway
+      - AI/NLP
+    highlight: "Serving 90k customers in Pakistani SME market"
+
+  - name: "Purchasing Power Prediction"
+    description: "MLOps pipeline with 87% accuracy using XGBoost and automated retraining"
+    tech_stack:
+      - MLOps
+      - XGBoost
+      - MLflow
+      - Scikit-Learn
+      - Docker
+    highlight: "87% accuracy with automated retraining pipeline"
+
+  - name: "Route Optimization"
+    description: "Geospatial analysis system with Kepler visualizations for route optimization"
+    tech_stack:
+      - Geospatial
+      - Kepler
+      - Python
+      - PostgreSQL
+    highlight: "Kepler-powered geospatial visualizations"
+
+agent_config:
+  orchestrator_model: "gemma3:1b"
+  content_model: "qwen3:8b"
+  fallback_model: "gemma2:9b"
+  logic_model: "phi4-mini"
+  intelligence_modes:
+    - local
+    - web_copilot
+    - hybrid

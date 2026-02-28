@@ -1,0 +1,33 @@
+# Environment variables (secrets)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# SQLite databases
+*.db
+
+# Cache files
+memory/github_cache.json
+
+# Test output files
+memory/test_*.txt
+memory/verify_*.txt
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Agent brain (local only)
+.gemini/
+.agent/
