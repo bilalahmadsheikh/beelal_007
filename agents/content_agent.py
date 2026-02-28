@@ -1,7 +1,7 @@
 """
 content_agent.py — BilalAgent v2.0 Content Generation Agent
 Professional Content Strategist for AI/ML Developers.
-Primary: Qwen3 8B (best 2025 output, hybrid thinking mode)
+Primary: Qwen3 4B Thinking (reasoning + quality output, 2.5GB)
 Fallback: Gemma 2 9B (reliable, well-tested)
 """
 
@@ -61,10 +61,10 @@ def generate(prompt: str, content_type: str = "general") -> str:
     """
     free = get_free_ram()
     
-    # Try Qwen3 8B first (best quality)
-    if free >= 5.0:
-        print(f"[CONTENT] Using Qwen3 8B (primary) — {free:.1f}GB free")
-        result = safe_run("qwen3:8b", prompt, required_gb=5.0, system=CONTENT_SYSTEM_PROMPT)
+    # Try Qwen3 4B Thinking first (best quality with reasoning)
+    if free >= 2.5:
+        print(f"[CONTENT] Using Qwen3 4B Thinking (primary) — {free:.1f}GB free")
+        result = safe_run("qwen3-4b-thinking", prompt, required_gb=2.5, system=CONTENT_SYSTEM_PROMPT)
         
         # Strip thinking tags if present (Qwen3 hybrid mode)
         result = _strip_thinking(result)
@@ -74,8 +74,8 @@ def generate(prompt: str, content_type: str = "general") -> str:
         
         # Quality check failed — retry once
         if not result.startswith("[ERROR]") and len(result) < 150:
-            print("[CONTENT] Output too short, retrying with Qwen3 8B...")
-            result = safe_run("qwen3:8b", prompt + "\n\nIMPORTANT: Write a complete, detailed response of at least 250 words.", required_gb=5.0, system=CONTENT_SYSTEM_PROMPT)
+            print("[CONTENT] Output too short, retrying with Qwen3 4B Thinking...")
+            result = safe_run("qwen3-4b-thinking", prompt + "\n\nIMPORTANT: Write a complete, detailed response of at least 250 words.", required_gb=2.5, system=CONTENT_SYSTEM_PROMPT)
             result = _strip_thinking(result)
             if not result.startswith("[ERROR]"):
                 return result

@@ -4,7 +4,7 @@ Handles all Ollama model calls with tiered keep_alive + prompt caching.
 
 Caching Strategy:
 - Orchestrator (gemma3:1b, ~1GB): keep_alive=5m — always warm, KV cache reused
-- Specialists (qwen3:8b, gemma2:9b): keep_alive=30s — short window for follow-ups
+- Specialists (qwen3-4b-thinking, gemma2:9b): keep_alive=30s — short window for follow-ups
 - After specialist finishes: explicit unload to reclaim RAM for next model
 - System prompts are hashed and reused consistently for KV cache hits
 """
@@ -30,7 +30,7 @@ KEEP_ALIVE_TIERS = {
     "gemma3:1b":   "5m",
     
     # Tier 2: Specialists — short window for back-to-back calls
-    "qwen3:8b":    "30s",
+    "qwen3-4b-thinking":    "30s",
     "gemma2:9b":   "30s",
     "phi4-mini":   "30s",
     
@@ -60,7 +60,7 @@ def run_model(model: str, prompt: str, system: str = "", keep_alive: str = None)
     The same system prompt → same KV cache prefix → fast TTFT on repeat calls.
     
     Args:
-        model: Model name (e.g. 'gemma3:1b', 'qwen3:8b')
+        model: Model name (e.g. 'gemma3:1b', 'qwen3-4b-thinking')
         prompt: User prompt to send
         system: Optional system prompt (cached in KV when model stays loaded)
         keep_alive: Override keep_alive (uses tier default if None)
@@ -156,7 +156,7 @@ def force_unload(model: str) -> None:
 
 def unload_all_specialists() -> None:
     """Unload all specialist models, keeping only the router (gemma3:1b)."""
-    for model in ["qwen3:8b", "gemma2:9b", "phi4-mini"]:
+    for model in ["qwen3-4b-thinking", "gemma2:9b", "phi4-mini"]:
         _unload_model(model)
 
 

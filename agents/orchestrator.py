@@ -17,12 +17,12 @@ ROUTER_SYSTEM_PROMPT = """You are a command router for a personal AI agent. Your
 Given a user command, classify it and output JSON with these exact keys:
 - "agent": one of "nlp", "content", "navigation", "memory"
 - "task": a short task name like "profile_query", "project_info", "write_cover_letter", "browse_jobs", "save_data", "analyze_job"
-- "model": the model to use, one of "gemma3:1b", "phi4-mini", "qwen3:8b"
+- "model": the model to use, one of "gemma3:1b", "phi4-mini", "qwen3-4b-thinking"
 
 Rules:
 - Questions about the user's profile, projects, skills, experience → agent: "nlp", model: "gemma3:1b"
 - Complex analysis, scoring, structured reasoning → agent: "nlp", model: "phi4-mini"
-- Writing cover letters, posts, proposals → agent: "content", model: "qwen3:8b"
+- Writing cover letters, posts, proposals → agent: "content", model: "qwen3-4b-thinking"
 - Browsing websites, scraping jobs → agent: "navigation", model: "gemma3:1b"
 - Storing/retrieving data, notes, memories → agent: "memory", model: "gemma3:1b"
 
@@ -30,7 +30,7 @@ Output ONLY the JSON object. No explanation, no markdown, no extra text. Just th
 
 
 SUPPORTED_AGENTS = {"nlp", "content", "navigation", "memory"}
-SUPPORTED_MODELS = {"gemma3:1b", "phi4-mini", "qwen3:8b", "gemma2:9b"}
+SUPPORTED_MODELS = {"gemma3:1b", "phi4-mini", "qwen3-4b-thinking", "gemma2:9b"}
 
 
 def route_command(user_input: str) -> dict:

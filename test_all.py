@@ -45,7 +45,7 @@ test("T0.1 get_free_ram()", free > 0, f"Got {free:.1f}GB")
 
 # T0.2: Keep-alive tiers
 test("T0.2 Orchestrator keep_alive=5m", _get_keep_alive("gemma3:1b") == "5m")
-test("T0.3 Specialist keep_alive=30s", _get_keep_alive("qwen3:8b") == "30s")
+test("T0.3 Specialist keep_alive=30s", _get_keep_alive("qwen3-4b-thinking") == "30s")
 test("T0.4 Default keep_alive=30s", _get_keep_alive("unknown_model") == "30s")
 
 # T0.5: Cold model call
@@ -144,7 +144,7 @@ post = generate_linkedin_post("IlmSeUrooj", "project_showcase")
 test("T2.2 LinkedIn post generated", len(post) > 100 and "[ERROR]" not in post, f"{len(post)} chars")
 test("T2.3 LinkedIn ≤ 1300 chars", len(post) <= 1400, f"{len(post)} chars")  # small buffer
 force_unload("gemma3:1b")
-force_unload("qwen3:8b")
+force_unload("qwen3-4b-thinking")
 time.sleep(2)
 
 print("  Generating cover letter...")
@@ -153,7 +153,7 @@ word_count = len(cover.split())
 test("T2.4 Cover letter generated", len(cover) > 200 and "[ERROR]" not in cover, f"{word_count} words")
 test("T2.5 Cover letter ≥ 150 words", word_count >= 150, f"{word_count} words")
 force_unload("gemma3:1b")
-force_unload("qwen3:8b")
+force_unload("qwen3-4b-thinking")
 time.sleep(2)
 
 print("  Generating gig description...")
@@ -162,7 +162,7 @@ test("T2.6 Gig returns dict", isinstance(gig, dict))
 test("T2.7 Gig has title", "title" in gig, str(list(gig.keys())))
 test("T2.8 Gig has packages", "packages" in gig, str(list(gig.keys())))
 force_unload("gemma3:1b")
-force_unload("qwen3:8b")
+force_unload("qwen3-4b-thinking")
 time.sleep(1)
 
 # T2.9: Content logging
