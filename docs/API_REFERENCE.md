@@ -28,62 +28,71 @@ Run a model only if enough free RAM is available. **All agent code must use this
 ### `route_command(user_input: str) → dict`
 Route a user command to the appropriate agent via Gemma 3 1B.
 
-| Param | Type | Description |
-|---|---|---|
-| `user_input` | `str` | Raw user command |
-| **Returns** | `dict` | `{"agent": str, "task": str, "model": str}` |
-
-**Supported agents:** `nlp`, `content`, `navigation`, `memory`
+**Supported agents:** `nlp`, `content`, `navigation`, `memory`, `jobs`
 **Supported models:** `gemma3:1b`, `phi4-mini`, `gemma3:4b`, `gemma2:9b`
-
----
-
-## agents/nlp_agent.py
-
-### `analyze(task, context="", model="gemma3:1b") → str`
-Run NLP analysis using profile data and optional context.
-
-| Param | Type | Description |
-|---|---|---|
-| `task` | `str` | User question or analysis task |
-| `context` | `str` | Additional context (e.g. GitHub data) |
-| `model` | `str` | Model to use (falls back to gemma3:1b if needed) |
-| **Returns** | `str` | Analysis result |
 
 ---
 
 ## agents/content_agent.py
 
 ### `generate(prompt, content_type="general") → str`
-Generate content using best available model (Gemma 3 4B → Gemma 2 9B → Gemma3 1B). System prompt built dynamically from `config/profile.yaml`. Auto-retries if output < 150 chars. Explicitly unloads specialist after generation.
+Generate content using best available model (Gemma 3 4B → Gemma 2 9B → Gemma3 1B). System prompt built dynamically from `config/profile.yaml`.
 
 ---
 
 ## tools/content_tools.py
 
 ### `generate_linkedin_post(project_name, post_type="project_showcase", user_request="") → str`
-Max ~3500 chars. Types: `project_showcase`, `learning_update`, `achievement`, `opinion`. Profile name loaded dynamically.
+Max ~3500 chars. Types: `project_showcase`, `learning_update`, `achievement`, `opinion`.
 
 ### `generate_cover_letter(job_title, company, job_description="", user_request="") → str`
-3-paragraph cover letter, 250-350 word target. Profile name/degree loaded dynamically.
+3-paragraph cover letter, 250-350 word target.
 
 ### `generate_gig_description(service_type, platform="fiverr", user_request="") → dict`
 JSON with title, description, tags, packages. Services: `mlops`, `chatbot`, `blockchain`, `data_science`, `backend`.
 
-All generators accept `user_request` — the full user input is injected into the prompt as `USER'S REQUEST:` to honor custom instructions.
+All generators accept `user_request` — the full user input is injected into the prompt.
 
 ---
 
-## ui/approval_cli.py
+## tools/job_tools.py
 
-### `show_approval(content_type, content) → str | None`
-CLI review: `[A]pprove` / `[E]dit` / `[C]ancel`. Returns `'approved'`, edited text, or `None`.
+### `score_job(job: dict) → dict`
+Score a job against user profile via gemma3:1b. Returns `{score, matching_skills, missing, reason}`. Profile cached in memory.
+
+### `get_top_jobs(jobs: list, min_score=65) → list`
+Score all jobs and return `(job, score)` tuples above min_score, sorted descending.
+
+---
+
+## tools/apply_workflow.py
+
+### `run_job_search(query, location="remote", num=20, min_score=65) → str`
+Full pipeline: CDP → JobSpy → score → display. Returns formatted results.
+
+### `run_apply_flow(job, score_result) → str`
+Generate cover letter, show for approval, save to file, log to Excel.
+
+---
+
+## tools/cdp_interceptor.py
+
+### `intercept_linkedin_jobs(search_query, max_jobs=20) → list`
+CDP intercept LinkedIn's Voyager API. Loads stored cookies from SQLite for authenticated access. Falls back to empty list on failure.
+
+---
+
+## tools/browser_tools.py
+
+### `post_to_linkedin(post_text: str) → bool`
+Post to LinkedIn via stealth browser + cookie reuse. Overlay approval with CLI fallback.
+
+### `fill_fiverr_gig(gig_data: dict) → bool`
+Fill Fiverr gig form via stealth browser. Overlay approval with CLI fallback.
 
 ---
 
 ## connectors/github_connector.py
-
-### `GitHubConnector` class
 
 | Method | Returns | Description |
 |---|---|---|
@@ -94,46 +103,52 @@ CLI review: `[A]pprove` / `[E]dit` / `[C]ancel`. Returns `'approved'`, edited te
 
 ---
 
+## connectors/jobspy_connector.py
+
+### `search_jobs(role, location="remote", num=20) → list`
+Search Indeed, Glassdoor, LinkedIn. 12h cache in `memory/job_cache.json`.
+
+---
+
 ## memory/db.py
 
 | Function | Description |
 |---|---|
-| `init_db()` | Create tables (profiles, action_log, memory_store, content_log) |
-| `save_profile(data: dict)` | Save/update user profile |
-| `get_profile() → dict` | Retrieve stored profile |
+| `init_db()` | Create all tables (profiles, action_log, memory_store, content_log, cookies, pending_tasks) |
+| `save_profile(data)` | Save/update user profile |
 | `log_action(type, details, status)` | Log an agent action |
-| `get_recent_actions(limit=20) → list` | Get recent action log entries |
-| `save_memory(key, value, category)` | Save key-value to memory store |
-| `get_memory(key) → str` | Retrieve value from memory store |
 | `log_content(type, content, status, platform, model)` | Log generated content |
-| `get_recent_content(type, limit) → list` | Get recent content entries |
+| `save_cookies(site, cookies)` | Store synced cookies |
+| `get_cookies(site)` | Retrieve stored cookies |
 
 ---
 
-## agent.py (CLI Entry Point)
+## memory/excel_logger.py
 
-### Usage
-```bash
-python agent.py "your command here"
-```
-
-### Startup Sequence
-1. Check RAM
-2. Initialize SQLite database
-3. Load profile from `config/profile.yaml`
-4. Sync GitHub repos
-
-### Command Pipeline
-1. **Route** via orchestrator (gemma3:1b) → JSON routing
-2. **Execute** via appropriate agent (nlp, content, navigation, memory)
-3. **Display** result with RAM delta
+### `log_application(job, score, status="applied", cover_letter_path="") → None`
+Log to `applied_jobs.xlsx` with color-coded scores (green ≥80, yellow ≥60, red <60).
 
 ---
 
-## FastAPI Bridge (Phase 3+)
+## FastAPI Bridge — `bridge/server.py`
+
+Base URL: `http://localhost:8000`
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/command` | POST | *Planned* — Send command to orchestrator |
-| `/approve` | POST | *Planned* — Approve/reject pending action |
-| `/status` | GET | *Planned* — Get agent status |
+| `/` | GET | Bridge status |
+| `/extension/context_snap` | POST | Receive job data from extension |
+| `/extension/approval` | POST | Receive approve/cancel from overlay |
+| `/extension/get_task` | GET | Extension polls for pending tasks |
+| `/extension/register_task` | POST | Agent registers task for overlay |
+| `/extension/cookies` | POST | Receive synced cookies → SQLite |
+| `/extension/cookies/{site}` | GET | Get stored cookies for a site |
+| `/extension/ai_response` | POST | Receive Claude/ChatGPT captures |
+| `/extension/status` | GET | Bridge health + task stats |
+
+---
+
+## ui/approval_cli.py
+
+### `show_approval(content_type, content) → str | None`
+CLI review: `[A]pprove` / `[E]dit` / `[C]ancel`. Returns `'approved'`, edited text, or `None`.

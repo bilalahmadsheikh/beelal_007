@@ -6,6 +6,52 @@ All notable changes to this project, listed by date.
 
 ## 2026-02-28
 
+### Audit — Phase 3+4 Quality Pass
+
+**Fixed:**
+- `job_tools.py` — Profile cached in memory (was 60x disk reads for 60 jobs)
+- `apply_workflow.py` — Removed double-scoring when no jobs pass min_score
+- `job_tools.py` — Removed unused `_load_profile_skills()` dead code
+- `cdp_interceptor.py` — Now loads stored LinkedIn cookies from SQLite
+- `content_tools.py` — Removed hardcoded `bilalahmadsheikh` GitHub fallback
+- `browser_tools.py` — CLI fallback when bridge is offline (was silently skipping)
+- All stealth files — Chrome user-agent updated from 131 to 137
+
+### Phase 4 — Chrome Extension + FastAPI Bridge
+
+**Added:**
+- `bridge/server.py` — FastAPI bridge with 8 endpoints (context_snap, approval, get_task, register_task, cookies CRUD, ai_response, status)
+- `chrome_extension/manifest.json` — Manifest V3 with cookie, scripting, storage, tabs permissions
+- `chrome_extension/background.js` — Cookie sync on install, message relay, task polling (2s)
+- `chrome_extension/content_script.js` — Context snap button, approval overlay, MutationObserver (Claude + ChatGPT)
+- `chrome_extension/popup.html` + `popup.js` — Dark-themed status popup
+- `chrome_extension/icons/` — 16/48/128px extension icons
+- `tools/browser_tools.py` — Playwright + stealth + cookie reuse + overlay approval
+- `memory/db.py` — Added `cookies` and `pending_tasks` tables
+
+**Tested:**
+- All 8 bridge endpoints verified working
+- Extension ready for chrome://extensions → Load unpacked
+
+### Phase 3 — Job Search + CDP + Stealth
+
+**Added:**
+- `connectors/jobspy_connector.py` — Multi-site scraper (Indeed, Glassdoor, LinkedIn) with 12h cache
+- `tools/cdp_interceptor.py` — CDP LinkedIn Voyager API interception with playwright-stealth
+- `tools/job_tools.py` — Profile-aware job scoring via gemma3:1b (0-100, with fallback keyword matching)
+- `memory/excel_logger.py` — Excel logger (`applied_jobs.xlsx`) with color-coded scores
+- `tools/apply_workflow.py` — Full pipeline: CDP → JobSpy → score → display → Excel
+- `agents/orchestrator.py` — Added `jobs` agent routing
+- `agent.py` — Added `_handle_jobs()`, `_parse_job_query()`, job examples
+
+**Tested:**
+- 60 jobs found across Indeed/Glassdoor/LinkedIn
+- All 60 scored at 22-31 tok/s with KV cache hits
+- Top 5 displayed (Snowflake 95, Zoom 92, Meta 92)
+- `applied_jobs.xlsx` created with 5 entries
+
+## 2026-02-28
+
 ### Phase 2 — Content Generation Engine
 
 **Added:**

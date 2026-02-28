@@ -7,27 +7,29 @@
 | Python | 3.12+ | [python.org](https://python.org) |
 | Node.js | 22+ | [nodejs.org](https://nodejs.org) |
 | Ollama | Latest | [ollama.com](https://ollama.com) |
+| Chrome | Latest | For extension loading |
 
 ## Python Packages
 
 ```bash
-pip install crewai playwright psutil fastapi uvicorn playwright-stealth python-dotenv requests pyyaml
+pip install crewai playwright psutil fastapi uvicorn playwright-stealth python-dotenv requests pyyaml openpyxl python-jobspy
+```
+
+### Playwright Setup
+```bash
+playwright install chromium
 ```
 
 ## Ollama Models
 
 ```bash
-# Required (Phase 0)
-ollama pull gemma3:1b
+# Required
+ollama pull gemma3:1b       # Orchestrator (router)
+ollama pull gemma3:4b       # Content generation
 
-# Required (Phase 1+)
-ollama pull gemma3:4b
-
-# Optional fallback
-ollama pull gemma2:9b
-
-# Optional logic/scoring
-ollama pull phi4-mini
+# Optional
+ollama pull gemma2:9b       # Fallback
+ollama pull phi4-mini       # Logic/scoring
 ```
 
 ## Environment Variables
@@ -41,6 +43,12 @@ OLLAMA_BASE_URL=http://localhost:11434
 BRIDGE_PORT=8000
 ```
 
+## Chrome Extension
+
+1. Open `chrome://extensions`
+2. Enable **Developer Mode**
+3. Click **Load unpacked** → select `D:\beelal_007\chrome_extension\`
+
 ## Verify Installation
 
 ```bash
@@ -48,16 +56,16 @@ BRIDGE_PORT=8000
 python --version  # → 3.12+
 
 # 2. Packages
-pip show crewai playwright psutil fastapi uvicorn playwright-stealth pyyaml
+pip show fastapi uvicorn playwright-stealth pyyaml openpyxl python-jobspy
 
 # 3. Ollama
-ollama list  # → gemma3:1b at minimum
+ollama list  # → gemma3:1b, gemma3:4b at minimum
 
-# 4. Node
-node --version  # → 22+
+# 4. Playwright
+python -c "from playwright.sync_api import sync_playwright; print('Playwright OK')"
 
 # 5. Model Runner
-python -c "from tools.model_runner import run_model, get_free_ram; print(f'RAM: {get_free_ram():.1f}GB'); print(run_model('gemma3:1b', 'Say: OK'))"
+python -c "from tools.model_runner import get_free_ram; print(f'RAM: {get_free_ram():.1f}GB')"
 ```
 
 ## Running the Agent
@@ -65,18 +73,22 @@ python -c "from tools.model_runner import run_model, get_free_ram; print(f'RAM: 
 ```bash
 cd D:\beelal_007
 
+# Start the bridge server (background)
+python -m uvicorn bridge.server:app --port 8000 &
+
 # Basic usage
 python agent.py "your command here"
 
 # Examples
 python agent.py "what are my 4 projects and their tech stacks"
 python agent.py "write a cover letter for a Python developer role"
-python agent.py "what commits did I make this month"
+python agent.py "find AI Engineer jobs remote"
+python agent.py "show my applications"
 ```
 
 ### What Happens on Startup
 1. **RAM check** — displays available memory
-2. **Database init** — creates SQLite tables if not present
+2. **Database init** — creates SQLite tables (profiles, actions, memory, content, cookies, tasks)
 3. **Profile load** — reads `config/profile.yaml` into memory
 4. **GitHub sync** — fetches repos and caches for 24h
 5. **Command routing** — orchestrator classifies → agent executes

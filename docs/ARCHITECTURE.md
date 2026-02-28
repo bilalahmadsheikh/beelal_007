@@ -131,39 +131,54 @@ User Input → Orchestrator (gemma3:1b, 5m cache)
 
 ```
 D:\beelal_007\
-├── agent.py             # ★ Main CLI entry point + command parsing
-├── agents/              # Agent definitions
-│   ├── orchestrator.py  # ★ Gemma 3 1B command router
-│   ├── content_agent.py # ★ Gemma 3 4B content generation (dynamic profile)
-│   └── nlp_agent.py     # ★ Profile-aware NLP analyst
-├── tools/               # Core utilities
-│   ├── model_runner.py  # ★ Ollama wrapper with tiered keep_alive
-│   └── content_tools.py # ★ LinkedIn, cover letter, gig generators
-├── connectors/          # Platform connectors
-│   └── github_connector.py  # ★ REST API + 24h cache
-├── memory/              # Persistent storage
-│   ├── db.py            # ★ SQLite memory layer
-│   ├── agent_memory.db  # SQLite database
-│   ├── github_cache.json # GitHub API cache
+├── agent.py                 # ★ Main CLI entry + command parsing + bridge startup
+├── agents/                  # Agent definitions
+│   ├── orchestrator.py      # ★ Gemma 3 1B command router (nlp/content/navigation/memory/jobs)
+│   ├── content_agent.py     # ★ Gemma 3 4B content generation (dynamic profile)
+│   └── nlp_agent.py         # ★ Profile-aware NLP analyst
+├── tools/                   # Core utilities
+│   ├── model_runner.py      # ★ Ollama wrapper with tiered keep_alive
+│   ├── content_tools.py     # ★ LinkedIn, cover letter, gig generators
+│   ├── job_tools.py         # ★ Job scoring via gemma3:1b (profile-matched, cached)
+│   ├── apply_workflow.py    # ★ Full job pipeline: search → score → approve → log
+│   ├── cdp_interceptor.py   # ★ LinkedIn Voyager API via Playwright CDP + stealth
+│   └── browser_tools.py     # ★ Stealth browser: LinkedIn post, Fiverr gig + overlay approval
+├── connectors/              # Platform connectors
+│   ├── github_connector.py  # ★ REST API + 24h cache
+│   └── jobspy_connector.py  # ★ Multi-site scraper (Indeed, Glassdoor, LinkedIn) + 12h cache
+├── memory/                  # Persistent storage
+│   ├── db.py                # ★ SQLite (profiles, actions, memory, content, cookies, tasks)
+│   ├── excel_logger.py      # ★ Excel logger (applied_jobs.xlsx) with color-coded scores
+│   ├── agent_memory.db      # SQLite database
+│   ├── github_cache.json    # GitHub API cache
+│   ├── job_cache.json       # JobSpy search cache (12h)
 │   ├── screenshots/
 │   ├── cover_letters/
 │   ├── gig_drafts/
 │   └── post_drafts/
-├── config/              # Configuration
-│   └── profile.yaml     # ★ Dynamic profile (name, GitHub, degree)
-├── ui/                  # Web UI (future)
-├── chrome_extension/    # Manifest V3 extension (future)
-├── bridge/              # FastAPI bridge (future)
-├── test_all.py          # ★ Full test suite (Phases 0-2)
-└── docs/                # Documentation
+├── bridge/                  # FastAPI bridge (localhost:8000)
+│   └── server.py            # ★ 8 endpoints: context_snap, approval, cookies, tasks, ai_response
+├── chrome_extension/        # Manifest V3 Chrome Extension
+│   ├── manifest.json        # ★ Permissions: cookies, scripting, storage, tabs
+│   ├── background.js        # ★ Cookie sync, message relay, task polling
+│   ├── content_script.js    # ★ Context snap button, approval overlay, MutationObserver
+│   ├── popup.html           # ★ Status popup with bridge connection indicator
+│   ├── popup.js             # ★ Popup logic
+│   └── icons/               # ★ Extension icons (16/48/128px)
+├── config/                  # Configuration
+│   └── profile.yaml         # ★ Dynamic profile (name, GitHub, degree, skills)
+├── ui/                      # Approval interfaces
+│   └── approval_cli.py      # ★ CLI fallback: [A]pprove / [E]dit / [C]ancel
+├── test_all.py              # ★ Full test suite (Phases 0-2)
+└── docs/                    # Documentation
 ```
 
-★ = Implemented in Phases 0-2
+★ = Implemented (Phases 0-4)
 
 ## Key Design Decisions
 
 1. **No paid APIs** — Everything runs locally or via free services
-2. **No Tkinter** — Approval happens via Chrome Extension overlay
+2. **No Tkinter** — Approval happens via Chrome Extension overlay (CLI fallback)
 3. **Never submit without approval** — Hard rule, no exceptions
 4. **RAM-first architecture** — Only one heavy model loaded at a time
 5. **Two-tier routing** — Lightweight 1B routes, heavier 4B executes on-demand
@@ -171,5 +186,10 @@ D:\beelal_007\
 7. **Tiered keep_alive** — Router stays warm (5m), specialists auto-expire (30s) + explicit unload
 8. **Dynamic profile** — All prompts read from profile.yaml, nothing hardcoded
 9. **24h caching** — GitHub data cached to avoid rate limits and speed up responses
-10. **SQLite audit trail** — Every action logged for transparency
-11. **User prompt passthrough** — Full user input passed as `user_request` to all generators
+10. **12h job cache** — JobSpy results cached to avoid repeated scraping
+11. **SQLite audit trail** — Every action logged for transparency
+12. **User prompt passthrough** — Full user input passed as `user_request` to all generators
+13. **Profile caching** — job_tools loads profile once, not per-job (in-memory cache)
+14. **Cookie sync** — Chrome Extension syncs cookies → SQLite → Playwright reuses them
+15. **Stealth everywhere** — playwright-stealth on all browser contexts, modern user-agents
+

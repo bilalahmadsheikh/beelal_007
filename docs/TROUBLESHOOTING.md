@@ -54,7 +54,7 @@ ollama pull gemma3:1b  # or whichever model is missing
 
 **Symptom:** `[GITHUB] API error: 409 Client Error`
 
-**Cause:** Empty repos return 409 when fetching commits. This is normal and handled gracefully — the connector skips empty repos.
+**Cause:** Empty repos return 409 when fetching commits. This is normal and handled gracefully.
 
 ---
 
@@ -62,7 +62,7 @@ ollama pull gemma3:1b  # or whichever model is missing
 
 **Error:** `UnicodeEncodeError: 'charmap' codec can't encode characters`
 
-**Fix:** Set encoding before running:
+**Fix:**
 ```powershell
 $env:PYTHONIOENCODING='utf-8'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -71,13 +71,79 @@ python agent.py "your command"
 
 ---
 
-### Import errors
+### Bridge not starting
 
-**Error:** `ModuleNotFoundError: No module named 'dotenv'`
+**Error:** `Address already in use` or `Connection refused`
 
 **Fix:**
 ```bash
-pip install python-dotenv pyyaml
+# Check if port 8000 is already in use
+netstat -ano | findstr :8000
+
+# Kill the process using it
+taskkill /PID <pid> /F
+
+# Restart bridge
+python -m uvicorn bridge.server:app --port 8000
+```
+
+---
+
+### Chrome Extension not loading
+
+**Symptom:** Extension doesn't appear in Chrome
+
+**Fix:**
+1. Go to `chrome://extensions`
+2. Enable **Developer Mode** (top right toggle)
+3. Click **Load unpacked**
+4. Select `D:\beelal_007\chrome_extension\`
+5. If errors: click **Errors** button on the extension card to see details
+
+---
+
+### Extension shows "Bridge Offline"
+
+**Symptom:** Popup shows red "Offline" badge
+
+**Fix:**
+1. Start bridge: `python -m uvicorn bridge.server:app --port 8000`
+2. Check bridge: `curl http://localhost:8000/`
+3. Should return `{"status": "running", "agent": "BilalAgent v2.0"}`
+
+---
+
+### Cookie sync not working
+
+**Symptom:** Playwright can't reuse login sessions
+
+**Fix:**
+1. Make sure you're logged in to the site in Chrome
+2. Open extension popup — check "Cookies" section shows the site
+3. Check SQLite: `python -c "from memory.db import *; init_db()"`
+4. Manually trigger sync: reinstall extension (Remove → Load unpacked again)
+
+---
+
+### JobSpy returns no results
+
+**Symptom:** `[JOBSPY] Search error: ...` or empty results
+
+**Fix:**
+1. Check internet connection
+2. Try different search terms
+3. Clear cache: `python -c "from connectors.jobspy_connector import clear_cache; clear_cache()"`
+4. JobSpy may be rate-limited — wait 5 minutes and retry
+
+---
+
+### Import errors
+
+**Error:** `ModuleNotFoundError: No module named '...'`
+
+**Fix:**
+```bash
+pip install python-dotenv pyyaml openpyxl python-jobspy playwright-stealth fastapi uvicorn
 ```
 
 ---
@@ -87,14 +153,13 @@ pip install python-dotenv pyyaml
 **Error:** `[ERROR] Ollama request timed out (300s).`
 
 **Fix:**
-1. The default timeout is 300 seconds. Large prompts on slow machines can approach this limit.
-2. Check if another model is consuming RAM: `ollama ps`
-3. Force unload stuck models:
+1. Check if another model is consuming RAM: `ollama ps`
+2. Force unload stuck models:
    ```python
-   from tools.model_runner import force_unload, unload_all_specialists
-   unload_all_specialists()  # Unloads all specialists, keeps router
+   from tools.model_runner import unload_all_specialists
+   unload_all_specialists()
    ```
-4. Try a shorter prompt or reduce context size.
+3. Try a shorter prompt or reduce context size.
 
 ---
 
