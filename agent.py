@@ -157,23 +157,33 @@ def handle_command(user_input: str, profile: dict):
     print(f"\n[STEP 2] Executing via {agent_name} agent (model: {model})...")
     
     if agent_name == "content":
-        result = _handle_content(user_input, task)
+        # Check if this is a freelance command first
+        freelance_result = _try_freelance(user_input)
+        if freelance_result is not None:
+            result = freelance_result
+        else:
+            result = _handle_content(user_input, task)
     
     elif agent_name == "nlp":
-        # Always include GitHub data
-        context = ""
-        try:
-            gh = GitHubConnector()
-            context = gh.get_summary()
-        except Exception:
-            pass
-        result = analyze(task=user_input, context=context, model=model)
+        # Check if freelance command was misrouted to NLP
+        freelance_result = _try_freelance(user_input)
+        if freelance_result is not None:
+            result = freelance_result
+        else:
+            # Always include GitHub data
+            context = ""
+            try:
+                gh = GitHubConnector()
+                context = gh.get_summary()
+            except Exception:
+                pass
+            result = analyze(task=user_input, context=context, model=model)
     
     elif agent_name == "memory":
         result = f"[MEMORY] Task '{task}' noted. Memory operations coming in future phases."
     
     elif agent_name == "navigation":
-        result = f"[NAVIGATION] Task '{task}' noted. Browser automation coming in Phase 4."
+        result = f"[NAVIGATION] Task '{task}' noted. Use browser tools for automation."
     
     elif agent_name == "jobs":
         result = _handle_jobs(user_input, task)
@@ -256,6 +266,143 @@ def _handle_jobs(user_input: str, task: str) -> str:
     print(f"  → Job search: '{query}' in '{location}'")
     
     return run_job_search(query, location)
+
+
+def _try_freelance(user_input: str):
+    """
+    Check if user_input is a freelance command. Returns result or None.
+    Handles: gig generation, proposals, upwork bio, freelance monitoring.
+    """
+    lower = user_input.lower()
+    
+    # Generate all gigs
+    if "generate all gigs" in lower or "create all gigs" in lower:
+        return _handle_generate_all_gigs(user_input)
+    
+    # Generate single gig: "generate fiverr gig for mlops"
+    gig_match = re.search(r'(?:generate|create)\s+(?:(fiverr|upwork)\s+)?gig\s+(?:for\s+)?(\w+)', lower)
+    if gig_match:
+        platform = gig_match.group(1) or "fiverr"
+        service = gig_match.group(2)
+        return _handle_generate_gig(service, platform)
+    
+    # Check new freelance projects
+    if any(kw in lower for kw in ["check new freelance", "freelance projects", "new projects", "upwork projects"]):
+        return _handle_freelance_monitor(user_input)
+    
+    # Write proposal: "write proposal for: [text]"
+    if "write proposal" in lower or "generate proposal" in lower:
+        return _handle_proposal(user_input)
+    
+    # Generate Upwork bio
+    if "upwork bio" in lower or "upwork profile" in lower:
+        return _handle_upwork_bio(user_input)
+    
+    return None
+
+
+def _handle_generate_all_gigs(user_input: str) -> str:
+    """Generate all 5 gig drafts."""
+    from tools.gig_tools import generate_all_gigs
+    from memory.excel_logger import log_gig
+    
+    # Detect platform
+    platform = "fiverr"
+    if "upwork" in user_input.lower():
+        platform = "upwork"
+    
+    print(f"  → Generating all gigs for {platform}")
+    gigs = generate_all_gigs(platform)
+    
+    # Log all gigs to Excel
+    for gig in gigs:
+        price_range = f"${gig.get('basic', {}).get('price_usd', '?')}-${gig.get('premium', {}).get('price_usd', '?')}"
+        log_gig(platform, gig.get("service", ""), gig.get("title", ""), "draft", price=price_range)
+    
+    # Format summary
+    lines = [f"\n✅ Generated {len(gigs)} gig drafts for {platform}\n{'═' * 50}"]
+    for i, gig in enumerate(gigs, 1):
+        lines.append(f"\n{i}. [{gig.get('service', '')}] {gig.get('title', '')}")
+        lines.append(f"   💰 ${gig.get('basic', {}).get('price_usd', '?')}-${gig.get('premium', {}).get('price_usd', '?')}")
+        lines.append(f"   🏷️ {', '.join(gig.get('tags', [])[:5])}")
+    lines.append(f"\n📁 Drafts saved to: memory/gig_drafts/")
+    
+    log_content("gig_batch", f"{len(gigs)} gigs generated", "generated", platform)
+    return "\n".join(lines)
+
+
+def _handle_generate_gig(service: str, platform: str) -> str:
+    """Generate a single gig draft."""
+    from tools.gig_tools import generate_gig
+    from memory.excel_logger import log_gig
+    
+    print(f"  → Generating {platform} gig for: {service}")
+    gig = generate_gig(service, platform)
+    
+    if "error" in gig:
+        return gig["error"]
+    
+    # Log to Excel
+    price_range = f"${gig.get('basic', {}).get('price_usd', '?')}-${gig.get('premium', {}).get('price_usd', '?')}"
+    log_gig(platform, service, gig.get("title", ""), "draft", price=price_range)
+    
+    log_content("gig_description", json.dumps(gig), "generated", platform)
+    return gig
+
+
+def _handle_freelance_monitor(user_input: str) -> str:
+    """Check for new freelance projects."""
+    from connectors.freelance_monitor import check_new_projects, display_projects
+    
+    # Extract custom keywords if provided
+    lower = user_input.lower()
+    keywords = None
+    if "for " in lower:
+        after = lower.split("for ", 1)[1].strip()
+        keywords = [k.strip() for k in after.split(",") if k.strip()]
+    
+    print(f"  → Checking freelance projects" + (f" for: {keywords}" if keywords else ""))
+    projects = check_new_projects(keywords)
+    
+    result = display_projects(projects)
+    log_action("freelance_monitor", f"{len(projects)} new projects found", "completed")
+    return result
+
+
+def _handle_proposal(user_input: str) -> str:
+    """Generate a freelance proposal."""
+    from tools.gig_tools import generate_proposal
+    
+    # Extract job text after "for:" or "for "
+    job_text = user_input
+    for sep in ["for:", "for "]:
+        if sep in user_input.lower():
+            idx = user_input.lower().index(sep) + len(sep)
+            job_text = user_input[idx:].strip()
+            break
+    
+    print(f"  → Generating proposal for: {job_text[:60]}...")
+    result = generate_proposal(job_text)
+    log_content("proposal", result, "generated")
+    return result
+
+
+def _handle_upwork_bio(user_input: str) -> str:
+    """Generate an Upwork profile bio."""
+    from tools.gig_tools import generate_upwork_bio
+    
+    # Detect focus
+    lower = user_input.lower()
+    focus = "ml_engineer"  # default
+    if "backend" in lower:
+        focus = "backend_dev"
+    elif "blockchain" in lower or "web3" in lower:
+        focus = "blockchain_dev"
+    
+    print(f"  → Generating Upwork bio (focus: {focus})")
+    result = generate_upwork_bio(focus)
+    log_content("upwork_bio", result, "generated", "upwork")
+    return result
 
 
 def _parse_job_query(user_input: str) -> tuple:

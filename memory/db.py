@@ -96,6 +96,17 @@ def init_db():
         )
     """)
     
+    # Phase 5: Seen projects for freelance monitor dedup
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS seen_projects (
+            project_id TEXT PRIMARY KEY,
+            title TEXT,
+            url TEXT,
+            keyword TEXT,
+            first_seen TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    
     conn.commit()
     conn.close()
     print("[DB] Database initialized at", DB_PATH)

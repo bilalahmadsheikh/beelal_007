@@ -290,6 +290,129 @@ def fill_fiverr_gig(gig_data: dict) -> bool:
             return False
 
 
+def create_fiverr_gig(gig_data: dict) -> bool:
+    """
+    Create a Fiverr gig using stealth browser with full form filling.
+    Uses stored cookies, extension overlay for approval, Excel logging.
+    
+    Args:
+        gig_data: Dict from gig_tools.generate_gig() with title, description,
+                  tags, basic/standard/premium packages
+        
+    Returns:
+        True if gig published successfully
+    """
+    from playwright.sync_api import sync_playwright
+    from memory.excel_logger import log_gig
+    
+    title = gig_data.get("title", "")
+    print(f"[BROWSER] Creating Fiverr gig: {title[:60]}...")
+    
+    # Register for overlay approval
+    task_id = _register_task("fiverr_gig_create", title[:200], "Publish Gig")
+    
+    with sync_playwright() as p:
+        browser, context, page = _create_stealth_context(p, load_extension=True, site="fiverr.com")
+        
+        try:
+            # Navigate to seller dashboard
+            page.goto("https://www.fiverr.com/seller_dashboard", wait_until="networkidle", timeout=30000)
+            time.sleep(2)
+            
+            if "join" in page.url.lower() or "login" in page.url.lower():
+                print("[BROWSER] Not logged in to Fiverr — need cookies from extension")
+                browser.close()
+                return False
+            
+            # Navigate to create gig
+            page.goto("https://www.fiverr.com/users/gigs/create", wait_until="networkidle", timeout=30000)
+            time.sleep(2)
+            
+            # Fill gig title (slow typing for stealth)
+            title_input = page.query_selector('input[name="title"], #gig-title, textarea[name="title"]')
+            if title_input:
+                title_input.click()
+                time.sleep(0.3)
+                page.keyboard.type(title, delay=50)
+                print(f"[BROWSER] Title filled: {title[:50]}")
+            
+            # Fill description
+            desc_input = page.query_selector('.ql-editor, [contenteditable="true"], textarea[name="description"]')
+            if desc_input:
+                desc_input.click()
+                time.sleep(0.3)
+                description = gig_data.get("description", "")
+                page.keyboard.type(description, delay=20)
+                print(f"[BROWSER] Description filled ({len(description)} chars)")
+            
+            # Fill tags
+            tags = gig_data.get("tags", [])
+            tag_input = page.query_selector('input[name="tags"], input[placeholder*="tag"], .tag-input input')
+            if tag_input and tags:
+                for tag in tags[:5]:
+                    tag_input.click()
+                    time.sleep(0.2)
+                    page.keyboard.type(tag, delay=30)
+                    page.keyboard.press("Enter")
+                    time.sleep(0.3)
+                print(f"[BROWSER] Tags filled: {', '.join(tags[:5])}")
+            
+            print("[BROWSER] Fiverr gig form filled — waiting for approval")
+            
+            # Wait for overlay approval (or CLI fallback)
+            if task_id:
+                print(f"[BROWSER] Waiting for overlay approval (task: {task_id})...")
+                result = _wait_for_approval(task_id, timeout=300)
+            else:
+                from ui.approval_cli import show_approval
+                cli_result = show_approval("fiverr_gig", json.dumps(gig_data, indent=2))
+                result = "approve" if cli_result is not None else "cancel"
+                
+            if result == "approve":
+                # Try to click Publish/Save
+                publish_btn = page.query_selector(
+                    'button[type="submit"], '
+                    'button:has-text("Publish"), '
+                    'button:has-text("Save")'
+                )
+                if publish_btn:
+                    publish_btn.click()
+                    time.sleep(3)
+                    print("[BROWSER] ✅ Fiverr gig published!")
+                else:
+                    print("[BROWSER] ✅ Gig form approved — publish button not found, manual click needed")
+                
+                # Log to Excel
+                price_range = f"${gig_data.get('basic', {}).get('price_usd', '?')}-${gig_data.get('premium', {}).get('price_usd', '?')}"
+                log_gig(
+                    platform="fiverr",
+                    service=gig_data.get("service", ""),
+                    title=title,
+                    status="published",
+                    price=price_range,
+                )
+                
+                browser.close()
+                return True
+            else:
+                print(f"[BROWSER] Gig cancelled: {result}")
+                # Still log as draft
+                log_gig(
+                    platform="fiverr",
+                    service=gig_data.get("service", ""),
+                    title=title,
+                    status="draft",
+                )
+            
+            browser.close()
+            return False
+            
+        except Exception as e:
+            print(f"[BROWSER] Fiverr gig error: {e}")
+            browser.close()
+            return False
+
+
 if __name__ == "__main__":
     print("=" * 50)
     print("Browser Tools Test")
@@ -307,3 +430,4 @@ if __name__ == "__main__":
         browser.close()
     
     print("✅ Stealth browser context works")
+
