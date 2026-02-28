@@ -1,0 +1,74 @@
+﻿============================================================
+  BilalAgent v2.0 — Starting Up
+============================================================
+
+[1/4] System RAM: 8.1GB free
+
+[2/4] Initializing database...
+[DB] Database initialized at D:\beelal_007\memory\agent_memory.db
+
+[3/4] Loading profile...
+       Profile: Bilal Ahmad Sheikh (4 projects)
+
+[4/4] Syncing GitHub...
+[GITHUB] Using cached repos (20 repos)
+       Found 20 repos
+
+============================================================
+  Agent Ready
+============================================================
+
+────────────────────────────────────────────────────────────
+Command: "write a linkedin post about IlmSeUrooj"
+────────────────────────────────────────────────────────────
+
+[STEP 1] Routing via Orchestrator (gemma3:1b)...
+  [TIMING] gemma3:1b: TTFT=2.0s | 42 tokens | 31.1 tok/s | keep_alive=5m
+         Routing: {
+  "agent": "content",
+  "task": "write_cover_letter",
+  "model": "qwen3:8b"
+}
+
+[STEP 2] Executing via content agent (model: qwen3:8b)...
+  → LinkedIn post about: ilmseurooj
+[GITHUB] Using cached repos (20 repos)
+  [CONTENT] Matched repo: IlmSeUrooj
+  [CONTENT] Fetching deep context (README + docs/ + commits)...
+[GITHUB] Using cached repos (20 repos)
+[GITHUB] Using cached commits (30 commits)
+[CONTENT] Using Qwen3 8B (primary) — 8.1GB free
+[CONTENT] Using Gemma3 1B (last resort) — 5.3GB free
+  [TIMING] gemma3:1b: TTFT=55.9s | 666 tokens | 31.1 tok/s | keep_alive=5m
+[GITHUB] Using cached repos (20 repos)
+
+────────────────────────────────────────────────────────────
+RESULT:
+────────────────────────────────────────────────────────────
+**Title:  Unlocking University Access: A Pakistan Student’s Project – Ilm Se Urooj**
+
+“Every year, thousands of Pakistani students apply to 5-10 universities – a daunting task that often leaves them feeling lost in a sea of options. As a student in Pakistan, I saw firsthand the frustration of countless students who couldn't navigate the endless university portal process. It felt like a monumental hurdle, and frankly, a little hopeless.”
+
+We’re thrilled to introduce Ilm Se Urooj – a Next.js application built to simplify the university search process.  Our project tackles this challenge by creating a smart, interactive platform that lets students swipe through universities like Tinder, instantly discovering which ones fit their profile. 
+
+**The Core: Swipe-Based Discovery**
+
+At the heart of Ilm Se Urooj is a unique swipe-based discovery system. Think of it as a digital map – students can effortlessly browse universities by quickly swiping left to save – or right to skip. We’ve built this using the `@next/server` framework for its server-side rendering capabilities. The initial design focuses on four key filters: Field, Degree Level, Program, and Hostel.  This filter system leverages `ui.components` with a `filter` component which ensures that all users receive an optimal experience.
+
+**Architectural Choices – Next.js & Supabase**
+
+We’ve chosen Next.js because its server-side rendering capabilities allow us to perform calculations upfront, optimizing performance. Supabase is our backend database, chosen for its robust geospatial capabilities and ease of integration. The foundation of the application runs on a MongoDB Atlas database to handle student data.  The UI is built entirely in React, ensuring a smooth and responsive experience.
+
+
+**Key Features – Building on the Core**
+
+*   **Smart Filter System:** We've implemented a sophisticated filter system leveraging a ‘intelligent’  `filter` component that will automatically prioritize the correct selection when the student chooses to ‘swipe’ a university.
+
+🔗 https://github.com/bilalahmadsheikh/IlmSeUrooj
+
+#OpenSource #GitHub #WebDev #BuildInPublic
+
+────────────────────────────────────────────────────────────
+Words: 306 | Chars: 2129
+RAM: 8.1GB → 8.9GB (delta: +0.8GB)
+────────────────────────────────────────────────────────────

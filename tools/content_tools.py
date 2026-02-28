@@ -152,28 +152,35 @@ def generate_linkedin_post(project_name: str, post_type: str = "project_showcase
     
     instruction = type_instructions.get(post_type, type_instructions["project_showcase"])
     
-    prompt = f"""Write a technical LinkedIn post about this project. Here is ALL the real data from the repo:
+    prompt = f"""Write a LinkedIn post about this project. Here is ALL the real data from the repo:
 
 {repo_ctx}
 
 Post type: {post_type}
 {instruction}
 
-STRUCTURE YOUR POST LIKE THIS:
-1. HOOK: Start with the technical problem this project solves (1 line, punchy)
-2. ARCHITECTURE: Name the specific tech stack from the data — frameworks, databases, APIs, patterns. Example: "Next.js App Router + Supabase + RLS policies" NOT "modern web technologies"
-3. STANDOUT FEATURES: Pick 2-3 specific features from the README/FEATURES.md and explain WHY they're technically interesting
-4. WHAT I LEARNED / WHAT'S HARD: One sentence about a technical challenge
-5. REPO LINK: Always end with the GitHub URL from the data above
-6. HASHTAGS: 3-5 relevant technical hashtags
+WRITE THE POST WITH THIS FLOW:
+
+1. THE PROBLEM (3-4 sentences):
+   Open with the real-world problem this project addresses. Make it personal — "As a student in Pakistan, I watched my friends..." or "Every admission season, students across Pakistan face...". Paint the picture so non-technical readers FEEL the frustration. Why does this matter? Who struggles with this?
+
+2. THE SOLUTION — HOW WE BUILT IT (3-4 sentences):
+   Now go technical. Name the exact architecture: what framework, what database, what APIs. Explain the key design decisions from the docs — WHY Next.js? WHY Supabase? WHY a Chrome Extension? Connect each tech choice back to solving the problem from section 1.
+
+3. STANDOUT FEATURES (3-4 sentences):
+   Pick 2-3 specific features from the FEATURES.md or README and describe them in detail. Don't just list them — explain what they DO and why they're useful. Example: "The swipe-based discovery lets students browse universities like Tinder — swipe right to save, left to skip. Behind the scenes, a smart filter considers grade level, program type, and hostel availability."
+
+4. WHAT'S NEXT + REPO LINK (1-2 sentences):
+   End with what you're working on next (from commits or PROGRESS.md if available), and link the repo.
 
 CRITICAL RULES:
-- Be DEEPLY TECHNICAL — name exact libraries, patterns, architecture choices from the docs
-- If the docs mention Next.js, Supabase, Chrome Extension, specific algorithms — NAME THEM
-- Include the actual GitHub repo URL from the data
-- MAXIMUM 1300 characters total
+- ONLY use facts from the data above — NEVER invent metrics or user counts
+- Be BOTH human (the story, the why) AND technical (the how, the architecture)
+- Write detailed paragraphs, NOT bullet points — this should feel like a story
+- TARGET 250-350 words (longer than typical, but more engaging)
 - NO preamble like "Here's a draft" — output ONLY the post itself
-- NO generic filler like "super cool" or "really proud" — replace with technical specifics
+- Include the actual GitHub repo URL from the data
+- End with 3-5 relevant hashtags
 - Write as Bilal Ahmad Sheikh, first person"""
 
     result = generate(prompt, content_type="linkedin_post")
@@ -181,11 +188,11 @@ CRITICAL RULES:
     # Post-processing: strip AI preamble
     result = _clean_post(result, project_name)
     
-    # Enforce character limit
-    if len(result) > 1300:
-        truncated = result[:1300]
+    # Enforce character limit (generous for longer posts)
+    if len(result) > 2200:
+        truncated = result[:2200]
         last_period = truncated.rfind('.')
-        if last_period > 800:
+        if last_period > 1500:
             result = truncated[:last_period + 1]
     
     # Ensure repo link is present
