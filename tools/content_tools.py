@@ -34,13 +34,84 @@ def _get_github_context() -> str:
         return ""
 
 
+def _find_repo_name(project_name: str) -> str | None:
+    """Fuzzy match a project name to an actual GitHub repo name."""
+    try:
+        gh = GitHubConnector()
+        repos = gh.get_repos()
+        search = project_name.lower().replace("-", "").replace("_", "").replace(" ", "")
+        
+        # Exact match first
+        for r in repos:
+            if r["name"].lower() == project_name.lower():
+                return r["name"]
+        
+        # Fuzzy match
+        for r in repos:
+            normalized = r["name"].lower().replace("-", "").replace("_", "")
+            if search in normalized or normalized in search:
+                return r["name"]
+        
+        return None
+    except Exception:
+        return None
+
+
+def _get_repo_context(project_name: str) -> str:
+    """
+    Fetch the actual README, repo metadata, and recent commits for a specific project.
+    This is the PRIMARY data source for content generation.
+    """
+    gh = GitHubConnector()
+    
+    # Find the actual repo name (fuzzy match)
+    repo_name = _find_repo_name(project_name)
+    if not repo_name:
+        print(f"  [CONTENT] Repo '{project_name}' not found on GitHub, using general context")
+        return _get_github_context()
+    
+    print(f"  [CONTENT] Matched repo: {repo_name}")
+    
+    lines = [f"=== PROJECT: {repo_name} ==="]
+    
+    # Repo metadata
+    repos = gh.get_repos()
+    for r in repos:
+        if r["name"] == repo_name:
+            lines.append(f"Language: {r['language'] or 'Not detected'}")
+            lines.append(f"Description: {r['description'] or 'No description'}")
+            lines.append(f"URL: {r['url']}")
+            lines.append(f"Last updated: {r['updated_at'][:10]}")
+            break
+    
+    # README content (the real gold)
+    readme = gh.get_readme(repo_name)
+    if readme:
+        # Truncate README to ~2000 chars to fit in prompt
+        if len(readme) > 2000:
+            readme = readme[:2000] + "\n... [README truncated]"
+        lines.append(f"\n=== README.md ===\n{readme}")
+    else:
+        lines.append("\n[No README found]")
+    
+    # Recent commits for this repo
+    commits = gh.get_recent_commits(days=60)
+    repo_commits = [c for c in commits if c["repo"] == repo_name]
+    if repo_commits:
+        lines.append(f"\n=== RECENT COMMITS ({len(repo_commits)}) ===")
+        for c in repo_commits[:10]:
+            lines.append(f"  - {c['message'][:100]} ({c['date'][:10]})")
+    
+    return "\n".join(lines)
+
+
 # ─────────────────────────────────────────────────────
 # LinkedIn Post Generator
 # ─────────────────────────────────────────────────────
 
 def generate_linkedin_post(project_name: str, post_type: str = "project_showcase") -> str:
     """
-    Generate a LinkedIn post about a project.
+    Generate a LinkedIn post about a project using its ACTUAL GitHub data.
     
     Args:
         project_name: Name of the project to write about
@@ -49,28 +120,29 @@ def generate_linkedin_post(project_name: str, post_type: str = "project_showcase
     Returns:
         LinkedIn post text (max 1300 chars, with hashtags)
     """
-    github_ctx = _get_github_context()
+    # Fetch REAL repo data (README, commits, metadata)
+    repo_ctx = _get_repo_context(project_name)
     
     type_instructions = {
-        "project_showcase": "Write a project showcase post. Lead with the problem solved, show the technical approach, highlight metrics and results.",
+        "project_showcase": "Write a project showcase post. Lead with the problem solved, show the technical approach, highlight results from the README.",
         "learning_update": "Write a learning journey post. Share what you learned building this, what surprised you, what you'd do differently.",
-        "achievement": "Write an achievement announcement. Celebrate a milestone, share the journey, thank the community.",
+        "achievement": "Write an achievement announcement. Celebrate a milestone, share the journey and specific features built.",
         "opinion": "Write a thought-leadership opinion post. Take a stance on a technical topic related to this project.",
     }
     
     instruction = type_instructions.get(post_type, type_instructions["project_showcase"])
     
-    prompt = f"""Write a LinkedIn post about the project: "{project_name}"
+    prompt = f"""Write a LinkedIn post about this project:
+
+{repo_ctx}
 
 Post type: {post_type}
 {instruction}
 
-Real GitHub data for reference:
-{github_ctx}
-
-Requirements:
-- Strong opening hook (first line grabs attention, NO generic "Excited to share...")  
-- Include specific metrics where relevant (87% accuracy, 40% improvement, 90k customers)
+CRITICAL RULES:
+- ONLY mention features, metrics, and tech stacks that appear in the README and commits above
+- Do NOT mix in other projects or make up metrics
+- Strong opening hook (NO generic "Excited to share...")
 - Sound like a real developer sharing their work, NOT AI-generated
 - Use line breaks between sections for readability
 - End with 3-5 relevant hashtags
@@ -82,7 +154,6 @@ Requirements:
     
     # Enforce character limit
     if len(result) > 1300:
-        # Truncate at last complete sentence before limit
         truncated = result[:1300]
         last_period = truncated.rfind('.')
         if last_period > 800:

@@ -1,0 +1,64 @@
+﻿============================================================
+  BilalAgent v2.0 — Starting Up
+============================================================
+
+[1/4] System RAM: 8.2GB free
+
+[2/4] Initializing database...
+[DB] Database initialized at D:\beelal_007\memory\agent_memory.db
+
+[3/4] Loading profile...
+       Profile: Bilal Ahmad Sheikh (4 projects)
+
+[4/4] Syncing GitHub...
+[GITHUB] Using cached repos (20 repos)
+       Found 20 repos
+
+============================================================
+  Agent Ready
+============================================================
+
+────────────────────────────────────────────────────────────
+Command: "write a linkedin post about IlmSeUrooj"
+────────────────────────────────────────────────────────────
+
+[STEP 1] Routing via Orchestrator (gemma3:1b)...
+  [TIMING] gemma3:1b: TTFT=2.1s | 42 tokens | 19.2 tok/s | keep_alive=5m
+         Routing: {
+  "agent": "content",
+  "task": "write_cover_letter",
+  "model": "qwen3:8b"
+}
+
+[STEP 2] Executing via content agent (model: qwen3:8b)...
+  → LinkedIn post about: ilmseurooj
+[GITHUB] Using cached repos (20 repos)
+  [CONTENT] Matched repo: IlmSeUrooj
+[GITHUB] Using cached repos (20 repos)
+[GITHUB] Fetching README for IlmSeUrooj...
+[GITHUB] Using cached repos (20 repos)
+[CONTENT] Using Qwen3 8B (primary) — 6.9GB free
+[CONTENT] Using Gemma3 1B (last resort) — 1.9GB free
+  [TIMING] gemma3:1b: TTFT=10.1s | 370 tokens | 29.7 tok/s | keep_alive=5m
+
+────────────────────────────────────────────────────────────
+RESULT:
+────────────────────────────────────────────────────────────
+Okay, here’s a LinkedIn post draft for IlmSeUrooj, aiming for a conversational and authentic feel as Bilal Ahmad Sheikh, focusing on the project’s features and showcasing the GitHub repository:
+
+---
+
+Hey everyone! 👋 Just wanted to share a cool project I’ve been diving into – IlmSeUrooj – a profile builder for Pakistani students applying to universities across the country. ⚡️
+
+The core idea?  We’ve built a super simple tool to make the university application process smoother. Think one profile, tons of options, and autofill magic! 🪄
+
+Right now, it’s a JavaScript project running on localhost:3000.  We've focused on a swipe-based interface for discovery, smart filtering by fields, saved universities, and a predictive admission chance calculator. 📊 It’s getting a lot of traction with features like the “Admission Chance predictor” – it’s getting smarter every day! 📈
+
+The README is a deep dive into how we’ve built the core functionality.  We’ve used Chrome extension for autofill, and are seriously working on the profile page too! ⚙️
+
+It’s a bit of a journey, but I’m really proud of the progress we've made.  If you’re curious about how we can simplify university application – check out the code and the repo [https://github.com/bilalahmadsheikh/IlmSeUrooj](https://github.
+
+────────────────────────────────────────────────────────────
+Words: 199 | Chars: 1284
+RAM: 8.2GB → 1.0GB (delta: -7.2GB)
+────────────────────────────────────────────────────────────

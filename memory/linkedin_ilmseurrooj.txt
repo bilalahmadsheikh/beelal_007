@@ -1,0 +1,65 @@
+﻿============================================================
+  BilalAgent v2.0 — Starting Up
+============================================================
+
+[1/4] System RAM: 9.8GB free
+
+[2/4] Initializing database...
+[DB] Database initialized at D:\beelal_007\memory\agent_memory.db
+
+[3/4] Loading profile...
+       Profile: Bilal Ahmad Sheikh (4 projects)
+
+[4/4] Syncing GitHub...
+[GITHUB] Using cached repos (20 repos)
+       Found 20 repos
+
+============================================================
+  Agent Ready
+============================================================
+
+────────────────────────────────────────────────────────────
+Command: "write a linkedin post about IlmSeUrooj"
+────────────────────────────────────────────────────────────
+
+[STEP 1] Routing via Orchestrator (gemma3:1b)...
+  [TIMING] gemma3:1b: TTFT=2.4s | 42 tokens | 17.8 tok/s | keep_alive=5m
+         Routing: {
+  "agent": "content",
+  "task": "write_cover_letter",
+  "model": "qwen3:8b"
+}
+
+[STEP 2] Executing via content agent (model: qwen3:8b)...
+  → LinkedIn post about: ilmseurooj
+[GITHUB] Using cached repos (20 repos)
+[GITHUB] Using cached commits (23 commits)
+[CONTENT] Using Qwen3 8B (primary) — 8.4GB free
+[CONTENT] Using Gemma3 1B (last resort) — 1.3GB free
+  [TIMING] gemma3:1b: TTFT=11.0s | 521 tokens | 31.2 tok/s | keep_alive=5m
+
+────────────────────────────────────────────────────────────
+RESULT:
+────────────────────────────────────────────────────────────
+Okay, here’s a LinkedIn post draft for Bilal Ahmad Sheikh, incorporating the requirements and aiming for a conversational and authentic tone. It’s roughly 1300 characters and follows the specified format:
+
+---
+
+Hey everyone! 👋 I’m incredibly excited to share a major project I’ve been pouring my heart into – IlmSeUrooj! 🎉
+
+We've tackled the challenge of providing accessible AI-powered solutions for Pakistani Small and Medium Enterprises (SMEs).  It’s a real passion project – specifically, we’ve built a **Purchasing Power Prediction model (87% accuracy!)** using XGBoost. 📈
+
+This project focuses on a practical application using **BaseL2 blockchain (40% performance improvement)** to provide insights to SME owners on their economic potential. 💰
+
+We've also built a **WhatsApp AI Chatbot** serving 90k customers in Pakistan. 🤖 It’s a game-changer for connecting businesses to crucial market data.
+
+Key features include: a **Pomodoro timer web app**, a **YouTube converter**, a **Car-Rental system**, and a **Calculator with GUI**. ⚙️
+
+GitHub’s showing 20+ repositories, a testament to the team’s dedication!  ➡️ [GitHub User: bilalahmadsheikh](https://github.com/bilalahmadsheikh)
+
+It’s a journey of learning and building – and I’m thrilled to see it all come to life.
+
+────────────────────────────────────────────────────────────
+Words: 185 | Chars: 1272
+RAM: 9.8GB → 9.0GB (delta: -0.7GB)
+────────────────────────────────────────────────────────────
