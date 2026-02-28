@@ -143,7 +143,7 @@ python -m uvicorn bridge.server:app --port 8000
 
 **Fix:**
 ```bash
-pip install python-dotenv pyyaml openpyxl python-jobspy playwright-stealth fastapi uvicorn
+pip install python-dotenv pyyaml openpyxl python-jobspy playwright-stealth fastapi uvicorn schedule
 ```
 
 ---
@@ -163,4 +163,41 @@ pip install python-dotenv pyyaml openpyxl python-jobspy playwright-stealth fasta
 
 ---
 
-*More issues will be added as the project progresses.*
+### Hybrid refinement timeout
+
+**Symptom:** `[HYBRID] Timed out after 120s`
+
+**Cause:** Claude.ai didn't respond in time, or MutationObserver didn't capture the response.
+
+**Fix:**
+1. Make sure you're logged into claude.ai in Chrome
+2. Ensure the Chrome Extension is loaded and active
+3. Start the bridge: `python -m uvicorn bridge.server:app --port 8000`
+4. Check that claude.ai is accessible (no CAPTCHA, account active)
+5. The refinement falls back to the original local draft on timeout
+
+---
+
+### Weekly posts generate 0 posts
+
+**Symptom:** `No posts generated — check GitHub activity.`
+
+**Fix:**
+1. Verify GitHub PAT is valid: `python -c "from connectors.github_connector import *; print(len(GitHubConnector().get_repos()))"`
+2. Check `.env` has `GITHUB_PAT` set
+3. Run manually: `python tools/post_scheduler.py --mode local`
+
+---
+
+### Windows scheduler not starting
+
+**Symptom:** `setup_scheduler_windows.py` fails
+
+**Fix:**
+1. Run as Administrator
+2. Check: `python setup_scheduler_windows.py check`
+3. Manual create: `schtasks /create /tn BilalAgent_Scheduler /tr "pythonw scheduler.py" /sc ONLOGON /f`
+
+---
+
+*Last updated: 2026-03-01 (Phase 6 complete)*

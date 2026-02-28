@@ -73,13 +73,13 @@ Exit code: 0
 **Status:** COMPLETE
 
 ### Architecture
-- **3-tier model fallback:** Qwen3 8B → Gemma 2 9B → Gemma3 1B
+- **3-tier model fallback:** Gemma 3 4B → Gemma 2 9B → Gemma3 1B
 - **Content tools:** LinkedIn posts, cover letters, gig descriptions
 - **CLI approval:** [A]pprove / [E]dit / [C]ancel (will become Chrome Extension in Phase 4)
 - **Content logging:** SQLite `content_log` table for all generated content
 
 ### Checklist
-- [x] `agents/content_agent.py` — 3-tier fallback with Qwen3 thinking tag stripping
+- [x] `agents/content_agent.py` — 3-tier fallback with quality check
 - [x] `tools/content_tools.py` — 3 generators grounded in real GitHub data
 - [x] `ui/approval_cli.py` — Approve/Edit/Cancel flow
 - [x] `memory/db.py` updated — `content_log` table + `log_content()`
@@ -87,7 +87,7 @@ Exit code: 0
 
 ### Test Results
 ```
-LinkedIn Post:  178 words | 1187 chars | Routing: content/qwen3:8b  ✅
+LinkedIn Post:  178 words | 1187 chars | Routing: content/gemma3:4b  ✅
 Cover Letter:   521 words | 3672 chars | Real repo references        ✅
 Gig Description: Valid JSON | 3 pricing tiers | 90k metric          ✅
 RAM: Recovered after each call (delta ~-1.2GB during generation)
@@ -99,6 +99,8 @@ RAM: Recovered after each call (delta ~-1.2GB during generation)
 - `ui/approval_cli.py` [NEW]
 - `memory/db.py` [MODIFIED]
 - `agent.py` [MODIFIED]
+
+---
 
 ## Phase 3: Job Search + CDP + Stealth ✅
 
@@ -180,3 +182,68 @@ Extension: Ready for chrome://extensions → Load unpacked ✅
 6. CLI fallback for offline bridge
 7. User-agent updated to Chrome 137
 
+---
+
+## Phase 5: Freelance Automation ✅
+
+**Date:** 2026-02-28
+**Status:** COMPLETE
+
+### Architecture
+- **Upwork RSS Monitor:** Polls Upwork feeds for matching projects
+- **Gig Generator:** Fiverr/Upwork gig descriptions + pricing tiers
+- **Proposal Pipeline:** Generate proposals matched to specific postings
+- **Dedup:** SQLite `seen_projects` table prevents duplicate alerts
+- **Excel Tracking:** `gigs_created.xlsx` logs all generated gigs
+
+### Checklist
+- [x] `connectors/freelance_monitor.py` — Upwork RSS with keyword matching + seen dedup
+- [x] `tools/gig_tools.py` — Gig generation + proposal writing + pricing
+- [x] `memory/excel_logger.py` — Added gigs_created.xlsx tracking (log_gig, get_gigs)
+- [x] `memory/db.py` — Added `seen_projects` table
+- [x] `agent.py` — Added `_try_freelance()` routing for gig/proposal/monitor commands
+
+### Test Results
+```
+Gig generation: valid JSON, title + description + tags + pricing ✅
+Upwork proposal: context-matched proposal text ✅
+Freelance monitor: RSS polling with seen-project dedup ✅
+gigs_created.xlsx: logging verified ✅
+```
+
+---
+
+## Phase 6: LinkedIn Brand Engine + Hybrid Refiner ✅
+
+**Date:** 2026-03-01
+**Status:** COMPLETE
+
+### Architecture
+- **GitHub Activity Monitor:** Tracks new repos, commits (7d), stars gained, README updates
+- **Weekly Post Generator:** 3 posts per week (project_showcase, learning_update, opinion)
+- **3 Generation Modes:** local (gemma3:4b), hybrid (local + Claude polish), web_copilot (full Claude)
+- **Hybrid Refiner:** Local draft → Playwright opens claude.ai → types refinement prompt → MutationObserver captures → ai_response returns polished text
+- **Background Scheduler:** `schedule` library — Monday 9am posts, hourly approved checks
+- **Windows Integration:** schtasks setup for login-triggered scheduler
+- **Excel Tracking:** `linkedin_posts.xlsx` with color-coded status (pending/approved/posted/rejected)
+
+### Checklist
+- [x] `connectors/github_monitor.py` — GitHubActivityMonitor class
+- [x] `tools/post_scheduler.py` — generate_weekly_posts + hybrid_refine (3 modes)
+- [x] `scheduler.py` — Background scheduler with graceful shutdown
+- [x] `setup_scheduler_windows.py` — Windows Task Scheduler (create/remove/check)
+- [x] `memory/excel_logger.py` — Added linkedin_posts.xlsx (log_post, get_posts)
+- [x] `memory/db.py` — Added `github_state` table
+- [x] `agent.py` — Added `_try_brand()` for brand/schedule/hybrid commands
+- [x] `chrome_extension/content_script.js` — task_id passthrough for hybrid
+
+### Test Results
+```
+GitHub Activity: 22 activities detected (20 repos + 2 commit groups) ✅
+Content Ideas: 3 ideas generated per call ✅
+Post 1: beelal_007 — 510 words, gemma3:4b, 78.8s ✅
+Post 2: IlmSeUrooj — 513 words, gemma3:1b, 42.3s ✅
+Post 3: purchasing_power_ml — 493 words, gemma3:4b, 60.9s ✅
+linkedin_posts.xlsx: created with color-coded entries ✅
+Agent routing: brand check / generate posts / hybrid commands ✅
+```

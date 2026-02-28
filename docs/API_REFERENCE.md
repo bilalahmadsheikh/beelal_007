@@ -55,6 +55,28 @@ All generators accept `user_request` — the full user input is injected into th
 
 ---
 
+## tools/post_scheduler.py (Phase 6)
+
+### `generate_weekly_posts(mode="local") → list`
+Generate 3 weekly LinkedIn posts based on GitHub activity. Modes: `local`, `hybrid`, `web_copilot`.
+
+Returns list of dicts: `{type, draft, final, path, words, status, mode}`
+
+### `hybrid_refine(draft, task_id="") → str`
+Send a draft to Claude web UI for polishing via Playwright + extension MutationObserver. Timeout: 120s, falls back to original draft.
+
+---
+
+## tools/gig_tools.py (Phase 5)
+
+### `generate_gig_listing(service_type, platform="fiverr") → dict`
+Generate Fiverr/Upwork gig listing with title, description, tags, pricing tiers.
+
+### `generate_proposal(project_data, user_profile) → str`
+Generate a proposal matched to a specific freelance posting.
+
+---
+
 ## tools/job_tools.py
 
 ### `score_job(job: dict) → dict`
@@ -100,6 +122,18 @@ Fill Fiverr gig form via stealth browser. Overlay approval with CLI fallback.
 | `get_readme(repo)` | `str` | README content for a repo |
 | `get_recent_commits(days=30)` | `list[dict]` | Recent commits across repos |
 | `get_summary()` | `str` | Human-readable GitHub summary |
+| `get_deep_repo_context(repo)` | `dict` | Full context: README + docs + commits + tree |
+
+---
+
+## connectors/github_monitor.py (Phase 6)
+
+### `GitHubActivityMonitor`
+
+| Method | Returns | Description |
+|---|---|---|
+| `check_new_activity()` | `list[dict]` | Activities since last check (new repos, commits, stars, README updates) |
+| `get_content_ideas()` | `list[dict]` | 3 post ideas based on activity |
 
 ---
 
@@ -110,11 +144,22 @@ Search Indeed, Glassdoor, LinkedIn. 12h cache in `memory/job_cache.json`.
 
 ---
 
+## connectors/freelance_monitor.py (Phase 5)
+
+### `FreelanceMonitor`
+
+| Method | Returns | Description |
+|---|---|---|
+| `check_upwork(keywords)` | `list[dict]` | Matching Upwork projects via RSS |
+| `get_new_projects()` | `list[dict]` | Unseen projects filtered by keywords |
+
+---
+
 ## memory/db.py
 
 | Function | Description |
 |---|---|
-| `init_db()` | Create all tables (profiles, action_log, memory_store, content_log, cookies, pending_tasks) |
+| `init_db()` | Create all tables (profiles, action_log, memory_store, content_log, cookies, pending_tasks, seen_projects, github_state) |
 | `save_profile(data)` | Save/update user profile |
 | `log_action(type, details, status)` | Log an agent action |
 | `log_content(type, content, status, platform, model)` | Log generated content |
@@ -127,6 +172,16 @@ Search Indeed, Glassdoor, LinkedIn. 12h cache in `memory/job_cache.json`.
 
 ### `log_application(job, score, status="applied", cover_letter_path="") → None`
 Log to `applied_jobs.xlsx` with color-coded scores (green ≥80, yellow ≥60, red <60).
+
+### `log_gig(platform, service_type, title, status, price="") → None`
+Log to `gigs_created.xlsx` with gig details and status tracking.
+
+### `log_post(post_type, preview, status, scheduled_time="", url="", mode="local") → None`
+Log to `linkedin_posts.xlsx` with color-coded status (pending=yellow, approved=blue, posted=green, rejected=red).
+
+### `get_applications(status=None) → list`
+### `get_gigs(status=None) → list`
+### `get_posts(status=None) → list`
 
 ---
 
@@ -143,7 +198,7 @@ Base URL: `http://localhost:8000`
 | `/extension/register_task` | POST | Agent registers task for overlay |
 | `/extension/cookies` | POST | Receive synced cookies → SQLite |
 | `/extension/cookies/{site}` | GET | Get stored cookies for a site |
-| `/extension/ai_response` | POST | Receive Claude/ChatGPT captures |
+| `/extension/ai_response` | POST | Receive Claude/ChatGPT captures (hybrid mode) |
 | `/extension/status` | GET | Bridge health + task stats |
 
 ---

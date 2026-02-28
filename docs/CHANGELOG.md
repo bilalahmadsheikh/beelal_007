@@ -4,7 +4,46 @@ All notable changes to this project, listed by date.
 
 ---
 
+## 2026-03-01
+
+### Phase 6 — LinkedIn Brand Engine + Hybrid Refiner
+
+**Added:**
+- `connectors/github_monitor.py` — GitHubActivityMonitor class (tracks repos, commits, stars, README updates)
+- `tools/post_scheduler.py` — Weekly post generation + hybrid_refine (3 modes: local/hybrid/web_copilot)
+- `scheduler.py` — Background scheduler (Monday 9am posts, hourly approved post checks)
+- `setup_scheduler_windows.py` — Windows Task Scheduler setup via schtasks
+- `memory/excel_logger.py` — Added `linkedin_posts.xlsx` tracking (log_post, get_posts)
+- `memory/db.py` — Added `github_state` table for activity monitoring
+- `agent.py` — Added `_try_brand()` routing for brand/schedule/hybrid commands
+- `chrome_extension/content_script.js` — Updated MutationObserver with task_id passthrough for hybrid mode
+
+**Tested:**
+- 3 weekly posts generated: beelal_007 (510 words), IlmSeUrooj (513 words), purchasing_power_ml (493 words)
+- GitHub Activity Monitor: 22 activities detected on first scan
+- linkedin_posts.xlsx created with color-coded status tracking
+- Agent routing: brand check, generate posts, hybrid commands all working
+
+---
+
 ## 2026-02-28
+
+### Phase 5 — Freelance Automation
+
+**Added:**
+- `connectors/freelance_monitor.py` — Upwork RSS feed monitor with keyword matching and seen-project dedup
+- `tools/gig_tools.py` — Fiverr/Upwork gig generation + proposal writing pipeline
+- `memory/excel_logger.py` — Added `gigs_created.xlsx` tracking (log_gig, get_gigs)
+- `memory/db.py` — Added `seen_projects` table for dedup
+- `agent.py` — Added `_try_freelance()` routing for gig/proposal/monitor commands
+
+**Tested:**
+- Gig generation: JSON output with title, description, tags, pricing tiers
+- Upwork proposal generation working
+- Freelance monitor polling Upwork RSS
+- gigs_created.xlsx logging verified
+
+---
 
 ### Audit — Phase 3+4 Quality Pass
 
@@ -50,71 +89,43 @@ All notable changes to this project, listed by date.
 - Top 5 displayed (Snowflake 95, Zoom 92, Meta 92)
 - `applied_jobs.xlsx` created with 5 entries
 
-## 2026-02-28
-
 ### Phase 2 — Content Generation Engine
 
 **Added:**
-- `agents/content_agent.py` — 3-tier model fallback (Qwen3 8B → Gemma 2 9B → Gemma3 1B)
-  - Qwen3 thinking tag stripping, quality check with auto-retry
-- `tools/content_tools.py` — 3 content generators
-  - `generate_linkedin_post()` — max 1300 chars, hashtags, quality check
-  - `generate_cover_letter()` — 3-paragraph structure, 250-350 word target
-  - `generate_gig_description()` — JSON with title, tags, 3 pricing tiers
+- `agents/content_agent.py` — 3-tier model fallback (Gemma 3 4B → Gemma 2 9B → Gemma3 1B)
+- `tools/content_tools.py` — 3 content generators (LinkedIn, cover letter, gig)
 - `ui/approval_cli.py` — CLI approval: [A]pprove / [E]dit / [C]ancel
-- `memory/db.py` — added `content_log` table + `log_content()` + `get_recent_content()`
-- `agent.py` — content command regex parsing for LinkedIn/cover letter/gig commands
+- `memory/db.py` — Added `content_log` table
+- `agent.py` — Content command regex parsing
 
 **Tested:**
 - LinkedIn post: 178 words, real GitHub data referenced
 - Cover letter: 521 words, references purchasing_power_ml, YouTube-Converter
 - Gig description: valid JSON, 3 tiers, 90k customer metric
-- RAM: Recovered after each generation call
-
-## 2026-02-28
 
 ### Phase 1 — Agent Brain + GitHub Memory
 
 **Added:**
-- `agents/orchestrator.py` — Command router using Gemma 3 1B with JSON-only output
-  - Routes to: nlp, content, navigation, memory agents
-  - Handles markdown fences and malformed model output gracefully
+- `agents/orchestrator.py` — Command router using Gemma 3 1B
 - `agents/nlp_agent.py` — Personal Intelligence Analyst
-  - Profile-aware answering from `config/profile.yaml`
-  - Model fallback: requested model → gemma3:1b if insufficient RAM
-  - Integrates GitHub context for project-related queries
-- `connectors/github_connector.py` — GitHub REST API connector
-  - PAT authentication from `.env`
-  - 24h JSON cache at `memory/github_cache.json`
-  - `get_repos()`, `get_readme()`, `get_recent_commits()`, `get_summary()`
+- `connectors/github_connector.py` — GitHub REST API + 24h cache
 - `memory/db.py` — SQLite memory layer
-  - Tables: profiles, action_log, memory_store
-  - UPSERT support for memory entries
-  - Action logging for audit trail
 - `config/profile.yaml` — Bilal's profile data
-  - 4 projects with full tech stacks
-  - 13 skills, education, GitHub info
-  - Agent model configuration
 - `agent.py` — Main CLI entry point
-  - Startup: DB init → profile load → GitHub sync
-  - Command pipeline: orchestrator route → agent execute → display
-- Package `__init__.py` files for agents, connectors, memory, tools
 
 **Tested:**
-- End-to-end: "what are my 4 projects and their tech stacks" → correct response
-- Orchestrator routing: valid JSON output
+- End-to-end: "what are my 4 projects" → correct response
 - GitHub: 20 repos, 23 commits cached
-- RAM: 2.6GB → 1.4GB (model loaded, generated, responded)
+- RAM: 2.6GB → 1.4GB
 
 ### Phase 0 — Environment + First File
 
 **Added:**
-- Project folder structure (agents, tools, connectors, memory/*, config, ui, chrome_extension, bridge, docs)
-- `.env` — Environment config (Ollama URL, GitHub credentials, bridge port)
-- `tools/model_runner.py` — Core model runner with `keep_alive:0` pattern
-- `docs/` — Full project documentation suite
+- Project folder structure (12 directories)
+- `.env` — Environment config
+- `tools/model_runner.py` — Core model runner
+- `docs/` — Documentation suite
 
 **Tested:**
-- Python 3.12.3, Node v22.17.0, Ollama with gemma3:1b
-- All pip packages: crewai, playwright, psutil, fastapi, uvicorn, playwright-stealth
-- Model runner: gemma3:1b responded correctly, RAM recovered +1.2GB after unload
+- Python 3.12.3, Node v22.17.0, Ollama running
+- Model runner: gemma3:1b responded correctly, RAM recovered

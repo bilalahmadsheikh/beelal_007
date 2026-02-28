@@ -12,7 +12,7 @@
 ## Python Packages
 
 ```bash
-pip install crewai playwright psutil fastapi uvicorn playwright-stealth python-dotenv requests pyyaml openpyxl python-jobspy
+pip install crewai playwright psutil fastapi uvicorn playwright-stealth python-dotenv requests pyyaml openpyxl python-jobspy schedule
 ```
 
 ### Playwright Setup
@@ -56,7 +56,7 @@ BRIDGE_PORT=8000
 python --version  # → 3.12+
 
 # 2. Packages
-pip show fastapi uvicorn playwright-stealth pyyaml openpyxl python-jobspy
+pip show fastapi uvicorn playwright-stealth pyyaml openpyxl python-jobspy schedule
 
 # 3. Ollama
 ollama list  # → gemma3:1b, gemma3:4b at minimum
@@ -79,16 +79,44 @@ python -m uvicorn bridge.server:app --port 8000 &
 # Basic usage
 python agent.py "your command here"
 
-# Examples
-python agent.py "what are my 4 projects and their tech stacks"
+# Examples — Content Generation
+python agent.py "write a linkedin post about IlmSeUrooj"
 python agent.py "write a cover letter for a Python developer role"
+
+# Examples — Job Search
 python agent.py "find AI Engineer jobs remote"
 python agent.py "show my applications"
+
+# Examples — Freelance
+python agent.py "generate fiverr gig for mlops"
+python agent.py "check upwork for python projects"
+
+# Examples — LinkedIn Brand (Phase 6)
+python agent.py "generate weekly posts"
+python agent.py "generate weekly posts hybrid"
+python agent.py "check github activity"
+python agent.py "brand check"
+```
+
+## Background Scheduler
+
+```bash
+# Run scheduler manually
+python scheduler.py
+
+# Register with Windows Task Scheduler (runs at login)
+python setup_scheduler_windows.py create
+
+# Check if registered
+python setup_scheduler_windows.py check
+
+# Remove from scheduler
+python setup_scheduler_windows.py remove
 ```
 
 ### What Happens on Startup
 1. **RAM check** — displays available memory
-2. **Database init** — creates SQLite tables (profiles, actions, memory, content, cookies, tasks)
+2. **Database init** — creates SQLite tables (profiles, actions, memory, content, cookies, tasks, seen_projects, github_state)
 3. **Profile load** — reads `config/profile.yaml` into memory
 4. **GitHub sync** — fetches repos and caches for 24h
 5. **Command routing** — orchestrator classifies → agent executes
