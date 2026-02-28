@@ -1,0 +1,54 @@
+{
+  "title": "I will Build Your MLOps & ML Pipelines",
+  "description": "I will help you streamline your Machine Learning workflows with robust MLOps solutions and high-performance ML pipelines. As an AI Engineering student (6th Semester) specializing in Python, Blockchain, and MLOps technologies, I bring a unique blend of practical experience and technical expertise. I focus on delivering tangible results, leveraging proven frameworks like FastAPI, MLflow, and Docker to optimize your ML projects.\n\nHere's what you get:\n\n*   **Custom MLOps Pipelines:** I’ll design and implement fully automated pipelines for training, deploying, and monitoring your models, drastically reducing your operational overhead. This includes integrating MLflow for experiment tracking and Docker for reproducible environments.\n*   **High-Performance ML Solutions:**  I’ve demonstrated expertise in achieving significant performance gains. For example, my basepy-sdk delivered a 40% performance improvement over Web3.py for interacting with the Base L2 blockchain.  I also developed a purchasing power prediction model with 87% accuracy and automated retraining, constantly improving results.\n*   **Scalable & Reliable Deployments:** I utilize modern cloud platforms like Supabase for rapid prototyping and scalable deployments, enabling you to serve up to 90,000 customers in the Pakistani SME market through my WhatsApp AI Chatbot.\n\n**Packages:**\n\n*   **Basic:**  I’ll build a simple MLOps pipeline with basic monitoring and deployment. (Price: $20, 3 days, 1 revision)\n*   **Standard:** A more comprehensive pipeline with automated retraining, detailed documentation, and enhanced monitoring. (Price: $65, 7 days, 2 revisions)\n*   **Premium:**  A fully customized solution including advanced features like integration with your existing infrastructure, comprehensive testing, and ongoing support. (Price: $130, 14 days, 3 revisions)",
+  "tags": [
+    "mlops",
+    "machine learning",
+    "pipeline",
+    "fastapi",
+    "docker",
+    "mlflow",
+    "blockchain",
+    "ai",
+    "python",
+    "geospatial"
+  ],
+  "requirements": [
+    "Clearly defined problem statement and data requirements",
+    "Access to relevant data sources and APIs",
+    "Feedback and approvals throughout the development process"
+  ],
+  "faq": [
+    {
+      "q": "What kind of models can you work with?",
+      "a": "I specialize in tabular data models utilizing algorithms like XGBoost and Scikit-Learn, but I'm adaptable and willing to explore other approaches based on your project needs."
+    },
+    {
+      "q": "What deployment options do you support?",
+      "a": "I primarily deploy to cloud platforms like Supabase and Railway, leveraging Docker containers for portability and scalability."
+    }
+  ],
+  "basic": {
+    "title": "Basic",
+    "description": "Includes a basic MLOps pipeline with core functionality and simple monitoring. This package covers the foundational steps: data preparation, model training (using XGBoost), and basic deployment to a local environment via Docker. Includes one revision for minor adjustments.",
+    "price_usd": 20,
+    "delivery_days": 3,
+    "revisions": 1
+  },
+  "standard": {
+    "title": "Standard",
+    "description": "This package provides a more robust and fully-featured MLOps pipeline, including automated retraining, comprehensive documentation, and enhanced monitoring. We'll implement MLflow for experiment tracking, Docker for reproducible environments, and a CI/CD pipeline for automated deployments. Includes two revisions for addressing specific feedback and refinements.",
+    "price_usd": 65,
+    "delivery_days": 7,
+    "revisions": 2
+  },
+  "premium": {
+    "title": "Premium",
+    "description": "The premium package offers a fully customized MLOps solution tailored to your specific needs, integrating seamlessly with your existing infrastructure. This includes advanced features like data validation, A/B testing, and dedicated support.  We’ll implement thorough testing, comprehensive documentation, and ongoing monitoring. Includes three revisions for detailed feedback incorporation and quality assurance.",
+    "price_usd": 130,
+    "delivery_days": 14,
+    "revisions": 3
+  },
+  "service": "mlops",
+  "platform": "fiverr"
+}

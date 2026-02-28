@@ -314,6 +314,7 @@ def _get_multi_repo_context(repo_names: list) -> str:
     """
     Fetch deep context for MULTIPLE repos.
     Used by cover letters and gig descriptions that reference several projects.
+    Each repo's context is compressed to prevent prompt bloat.
     """
     gh = GitHubConnector()
     sections = []
@@ -322,13 +323,25 @@ def _get_multi_repo_context(repo_names: list) -> str:
         repo_name = _find_repo_name(name)
         if repo_name:
             print(f"  [CONTENT] Fetching deep context for: {repo_name}")
-            ctx = gh.get_deep_repo_context(repo_name)
-            sections.append(ctx)
+            raw = gh.get_deep_repo_context(repo_name)
+            compressed = _compress_context(raw)
+            # Limit each repo to ~2500 chars to keep total under 8000
+            if len(compressed) > 2500:
+                compressed = compressed[:2500]
+                last_line = compressed.rfind("\n")
+                if last_line > 2000:
+                    compressed = compressed[:last_line]
+            sections.append(compressed)
     
     if not sections:
         return _get_github_context()
     
-    return "\n\n" + ("\n\n---\n\n".join(sections))
+    combined = "\n\n---\n\n".join(sections)
+    # Hard cap at 8000 chars total for model safety
+    if len(combined) > 8000:
+        combined = combined[:8000]
+    
+    return "\n\n" + combined
 
 
 def _find_relevant_repos(job_title: str, service_type: str = "") -> list:

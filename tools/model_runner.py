@@ -103,6 +103,12 @@ def run_model(model: str, prompt: str, system: str = "", keep_alive: str = None,
     
     start = time.time()
     
+    # Guard against oversized prompts that would stall the model
+    if len(prompt) > 12000:
+        print(f"  [WARN] Prompt too large ({len(prompt)} chars), truncating to 12000")
+        prompt = prompt[:12000]
+        payload["prompt"] = prompt
+    
     try:
         response = requests.post(url, json=payload, timeout=300)
         response.raise_for_status()

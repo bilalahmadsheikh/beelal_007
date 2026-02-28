@@ -96,7 +96,7 @@ def _create_stealth_context(playwright, load_extension: bool = False, site: str 
     # Apply stealth
     stealth = Stealth()
     page = context.new_page()
-    stealth.apply_stealth(page)
+    stealth.apply_stealth_sync(page)
     
     # Load stored cookies if available
     if site:

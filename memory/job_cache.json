@@ -1,0 +1,172 @@
+{
+  "python developer|remote|5": {
+    "cached_at": "2026-03-01T00:52:57.514559",
+    "jobs": [
+      {
+        "title": "Security Software Engineer L5, Cryptography Services Team",
+        "company": "Netflix",
+        "location": "United States",
+        "url": "https://www.glassdoor.com/job-listing/j?jl=1010046578764",
+        "description": "At Netflix, our mission is to entertain the world. Together, we are writing the next episode \\- pushing the boundaries of storytelling, global fandom and making the unimaginable a reality. We are a dream team obsessed with the uncomfortable excitement of discovering what happens when you merge creativity, intuition and cutting\\-edge technology. Come be a part of what\u2019s next.\n\n\nEvery time you watch a show or play a game on Netflix, the Cryptography Services team is quietly working behind the scenes to keep your data and Netflix\u2019s most critical systems secure, reliable, and available.\n  \n\n  \n\nAs Netflix continues to innovate and expand into new business domains, the need for robust, scalable, and invisible security has never been greater. That\u2019s where the Cryptography Services team comes in. Our mission is to empower Netflix teams to innovate boldly and securely by making world\\-class cryptography simple, scalable, and invisible.\n\n\n**About the Team**\n\nWe design, build, and operate foundational cryptographic services that enable Netflix\u2019s platforms and applications to move fast, stay secure, and focus on what they do best. Our scope includes centrally managed PKI and certificate lifecycle management, as well as Crypto\\-as\\-a\\-Service. We lead Netflix\u2019s Crypto Agility initiatives, including the migration to Post\\-Quantum Cryptography. We believe in solving cryptographic problems at scale, abstracting away complexity, and enabling a secure\\-by\\-default environment for all of Netflix\u2019s engineering teams.\n\n\nThe Cryptography Services team is well\\-established and cohesive, providing the support you need to do your best work. We strive to create a positive and supportive work environment that values collaboration over individual achievement. The Netflix culture determines who we hire, how we work together, and how we make decisions. It will inspire you to bring your best every day and to find new ways to make us all better.\n\n\n**What You'll Do**\n\n* Design, build, and maintain",
+        "salary": "USD 400,000-680,000/yearly",
+        "site_name": "glassdoor",
+        "date_posted": "2026-02-28"
+      },
+      {
+        "title": "Fullstack Developer (Node.js, Java)",
+        "company": "UST Global",
+        "location": "San Jose, CA",
+        "url": "https://www.glassdoor.com/job-listing/j?jl=1010046438425",
+        "description": "1 Opening\nSan Jose  \n\n\n### **Role description**\n\n\n**Fullstack Developer (Node.js, Java)**\n\n\n**Developer II \\- Software Engineering**\n\n  \n\n\n**Who We Are:**\n\n\n\nBorn digital, UST transforms lives through the power of technology. We walk alongside our clients and partners, embedding innovation and agility into everything they do. We help them create transformative experiences and human\\-centered solutions for a better world.\n\n\n\nUST is a mission\\-driven group of 29,000\\+ practical problem solvers and creative thinkers in more than 30 countries. Our entrepreneurial teams are empowered to innovate, act nimbly, and create a lasting and sustainable impact for our clients, their customers, and the communities in which we live.\n\n\n\nWith us, you\u2019ll create a boundless impact that transforms your career\u2014and the lives of people across the world.\n\n\n\nVisit us at UST.com.\n\n  \n\n\n**You Are:**\n\n\n\nUST is searching for a Fullstack Developer who will provide ongoing support and maintenance for existing web applications developed in Angular, Node.js, and Java.\n\n  \n\n\n**The opportunity:**\n\n\n* Diagnosticate and resolve technical issues in applications and data systems.\n* Implement ETL processes to load data into the data lake.\n* Model data structures in the data lake, implementing partitioning to improve query efficiency.\n* Document ETL process steps, including data extraction, transformation, and loading.\n* Collaborate with data analysis teams to ensure data is organized and optimized.\n\n  \n\n\n\nThis position description identifies the responsibilities and tasks typically associated with the performance of the position. Other relevant essential functions may be required.\n\n  \n\n\n**What you need****:**\n\n\n* Proven experience in supporting and maintaining frontend applications with Angular.\n* Proven experience in supporting and maintaining APIs.\n* Ability to write clean and efficient code in languages such as Java, JavaScript (Node.js), Python, SQL, Spark, etc.\n* Experience with database management sy",
+        "salary": "USD 122,590-173,128/yearly",
+        "site_name": "glassdoor",
+        "date_posted": "2026-02-27"
+      },
+      {
+        "title": "Associate Software Engineer - Seeking 2025 & 2026 Grads",
+        "company": "Veeva Systems",
+        "location": "Kansas City, KS",
+        "url": "https://www.glassdoor.com/job-listing/j?jl=1010046412358",
+        "description": "",
+        "salary": "USD 112,500-112,500/yearly",
+        "site_name": "glassdoor",
+        "date_posted": "2026-02-27"
+      },
+      {
+        "title": "GIS Python Developer",
+        "company": "NiyamIT",
+        "location": "Washington, DC",
+        "url": "https://www.glassdoor.com/job-listing/j?jl=1010045556589",
+        "description": "",
+        "salary": "USD 84,037-131,092/yearly",
+        "site_name": "glassdoor",
+        "date_posted": "2026-02-27"
+      },
+      {
+        "title": "Software Developer",
+        "company": "Oracle",
+        "location": "Austin, TX",
+        "url": "https://www.glassdoor.com/job-listing/j?jl=1010045435047",
+        "description": "**Entity:** Oracle America, Inc.  \n\n\n\n**Job Duties** : Design, develop, troubleshoot and/or test/QA software. As a member of the software engineering division, apply knowledge of software architecture to perform tasks associated with developing, debugging, or designing software applications or operating systems according to provided design specifications. Build enhancements within an existing software architecture and/or suggest improvements to the architecture. May telecommute. (385\\.29993\\)  \n\n\n\nEmployer will accept a Bachelor's degree in Computer Science, Engineering or related technical field and 1 year of experience in the job offered or in a Software Developer\\-related occupation.  \n\n\n\nPosition Requires:\n\n\n* Writing backend code using Java, Python, C\\+\\+, or similar OO language and front\\-end code using either of AngularJS, ReactJS, Typescript;\n* Cloud Infrastructure and Automation operating in a major cloud provider including OCI, AWS, Azure, or GCP;\n* MacOS and Apple Hardware having strong knowledge in bare metal provision, automated OS deployments;\n* Microservice, REST API Development and understanding of databases including MySQL, Oracle, MongoDB, MS SQL Server, SQL, or PL/SQL;\n* Monitoring, Observability, logging with tools including Graphana , Prometheus with mission\\-critical services;\n* LINUX \\& Networking fundamentals; and\n* Devops principals including CI/CD, Kubernetes and Infrastructure as Code (IAC) languages including Terraform.",
+        "salary": "USD 77,845-123,487/yearly",
+        "site_name": "glassdoor",
+        "date_posted": "2026-02-27"
+      },
+      {
+        "title": "Software Developer Intern",
+        "company": "BHAYAT NGO",
+        "location": "Remote, US",
+        "url": "https://www.indeed.com/viewjob?jk=6bc85b37d84b79bc",
+        "description": "**Job Overview**  \nWe are seeking a motivated and energetic Software Developer Intern to join our dynamic development team. This paid internship offers an exciting opportunity to gain hands\\-on experience in software development, working with cutting\\-edge technologies and industry best practices. As a Software Developer Intern, you will contribute to real\\-world projects, collaborate with experienced engineers, and develop your skills across various programming languages and frameworks. This role is perfect for passionate individuals eager to dive into the world of web and application development, while supporting innovative solutions that make a difference.\n\n**Duties**\n\n* Assist in designing, coding, testing, and debugging software applications using languages such as Java, Python, C\\+\\+, C\\#, and JavaScript.\n* Collaborate on front\\-end development tasks utilizing React, Express, and RESTful APIs to create user\\-friendly interfaces.\n* Support the integration of cloud services like AWS and Azure to enhance application scalability and security.\n* Contribute to the development and maintenance of web applications using Ruby on Rails, .NET, and other frameworks.\n* Work within Agile teams to participate in sprint planning, daily stand\\-ups, and code reviews using version control tools like GitHub, Git, and SVN.\n* Assist in managing databases such as MySQL and SQL Server by writing queries and optimizing performance.\n* Gain exposure to Linux environments for application deployment and testing purposes.\n* Learn about IT infrastructure components including RBAC (Role\\-Based Access Control), REST APIs, and application security best practices.\n\n**Qualifications**\n\n* Currently enrolled in a Bachelor\u2019s or Master\u2019s degree program in Computer Science, Software Engineering, or related field.\n* Demonstrated knowledge of software development principles across multiple programming languages including Python, JavaScript, C\\+\\+, or C\\#.\n* Familiarity with web development frameworks su",
+        "salary": "USD 49,998-60,212/yearly",
+        "site_name": "indeed",
+        "date_posted": "2026-02-28"
+      },
+      {
+        "title": "Senior Software Engineer",
+        "company": "GitHub",
+        "location": "Remote, US",
+        "url": "https://www.indeed.com/viewjob?jk=1e466975d9cc8d2a",
+        "description": "About GitHub: GitHub is the world\u2019s leading platform for agentic software development \u2014 powered by Copilot to build, scale, and deliver secure software. Over 180 million developers, including more than 90% of the Fortune 100 companies, use GitHub to collaborate, and more than 77,000 organisations have adopted GitHub Copilot.  \n\nLocations: In this role you can work from Remote, United States  \n\nOverview:\n\nGitHub is changing the way the world builds software, and we want you to help lead this effort.\n\n\nThe API Gateway plays a critical role in GitHub's scalability and resiliency. The API Gateway team is responsible for evolving and operating this critical component and help elevate standards and best practices for traffic management at GitHub. The team\u2019s objective is to ensure that GitHub continues to operate industry\\-leading services at global scale, and to ensure internal engineering teams have the tools and processes necessary to build on top of our platform with as little friction as possible.\n\n  \n\nAs a Senior Software Engineer on the Gateway Team, you will work closely with a distributed, diverse, and passionate team of engineers to improve and maintain part of the platform that millions of developers worldwide rely on in their software development cycle.\n\n  \n\nThe Gateway team is highly distributed, and you will thrive in an environment of remote work and asynchronous communication. You're expected to have strong written communication skills and be able to develop working relationships with coworkers in locations around the globe. As an engineer at GitHub, you'll always be challenged to solve interesting and novel problems that have a real impact on how the world builds software.\n\n\nResponsibilities:\n* Lead technical decision making and architecture.\n* Design and implement scalable, reliable and performant solutions for complex problems like rate\\-limiting, routing, etc.\n* Maintain and improve the API Gateway, and other systems related to traffic management at Git",
+        "salary": "USD 124,000-329,200/yearly",
+        "site_name": "indeed",
+        "date_posted": "2026-02-27"
+      },
+      {
+        "title": "Engineer Intern 3D Graphics",
+        "company": "HERE Technologies",
+        "location": "Remote, US",
+        "url": "https://www.indeed.com/viewjob?jk=ee003914988d9fc0",
+        "description": "What's the role?:\n\nThe HERE DataViz team utilizes a variety of cutting\\-edge technologies, algorithms, and tools to build pipeline services that produce beautiful, aligned, scalable, and customizable 3D representations of our location\\-based data to enrich and improve our customers' experiences, including our new Premier 3D Cities product. We are a group of talented engineers who delight in applying our extensive experience in video game, 3D modeling, and service\\-oriented development using native C\\+\\+ and Python to achieve that vision in concert with a variety of other motivated and energetic teams. Following our company values *Learn Fast* and *Win Together*, we collaborate with external partners and other teams within HERE to ensure that our customers always get best of technology and services for their everyday use and to support their business. We correspondingly work with the full stack of the HERE UniMap architecture ranging from the tooling used by the map experts and customers to the content delivery mechanisms implemented on top of the HERE Platform. We are a team with front\\- and back\\-end developers, test automation experts, devops and data engineers. We are primarily based in the US and have a good mix of people that can coach new joiners. Come join the fun!  \n\nWe are now looking for a 3D Graphics Engineering Intern to join our team and work on our next generation 3D mapping technology. This is an excellent opportunity to work with an energetic and dedicated team and contribute to several large, sophisticated, cloud\\-based software systems. We serve both business customers and consumers with the energy of a start\\-up and the stability of an established operation. We care passionately about our customers, our products, and each other. We are interested in candidates with experience and specialization in 3D math and graphics, GIS, mapping, computer vision, visual simulation, big data, AI/ML, and/or LiDAR technology.  \n\nIn this role you will:* Utilize ski",
+        "salary": "USD 25-35/hourly",
+        "site_name": "indeed",
+        "date_posted": "2026-02-27"
+      },
+      {
+        "title": "DevOps Engineer",
+        "company": "Novara",
+        "location": "Remote, US",
+        "url": "https://www.indeed.com/viewjob?jk=6b8f10d427f1020c",
+        "description": "Novara provides safety and operational risk management software that empowers organizations to identify and resolve issues before they become incidents. Through the Flex and Risk Management Center platforms, Novara helps organizations address operational risk proactively by unifying data, increasing workforce engagement, and proactively managing risk. Novara\u2019s combination of training, software, and tools puts people and safety first while protecting critical operations. **Position Description:**\nAs a member of the Technology team, the DevOps Engineer will play a crucial role in overseeing deployment automation, site reliability, and security. The successful candidate has experience automating processes, identifying vulnerabilities early in the development process, and ensuring the security and compliance of applications, systems, and infrastructure\n### **Responsibilities:**\n\n* Design, implement, and maintain secure infrastructure using Infrastructure as Code (IaC) practices\n* Build, own, and improve CI/CD pipelines to deliver features safely and quickly\n* Collaborate with Development and Data teams to integrate security into the software development lifecycle (SDLC), including design, development, testing, deployment, and maintenance phases\n* Build and operate Kubernetes clusters and related networking and ensure secure cluster configuration.\n* Automate container build, registry management, and runtime security controls.\n* Implement security controls within the build pipeline and tests to identify vulnerabilities, code flaws, and misconfigurations, and manage security tools such as static and dynamic application security testing (SAST/DAST), container security, and vulnerability scanners\n* Brainstorm for new ideas and ways to improvement development delivery\n* Provide technicalguidanceandeducateteammembersandcoworkersonDevOps best practices\n* Maintain clear and up\\-to\\-date documentation of DevOps security practices, procedures, and standards\n* Participate in sprint",
+        "salary": "USD 140,000-155,000/yearly",
+        "site_name": "indeed",
+        "date_posted": "2026-02-27"
+      },
+      {
+        "title": "AI Enablement Engineer",
+        "company": "GALAXY",
+        "location": "Remote, US",
+        "url": "https://www.indeed.com/viewjob?jk=6863ac7bba3e6e79",
+        "description": "**Who We Are:**  \n\nGalaxy is a global leader in digital assets and data center infrastructure, delivering solutions that accelerate progress in finance and artificial intelligence. We believe that blockchain and digital asset innovation will transform how value moves through the world \u2013 and we're building the products and services to make that future a reality.  \n\n  \n\nOur institutional digital assets platform spans trading, investment banking, asset management, staking, self\\-custody, and tokenization technology. We also invest in and operate cutting\\-edge data center infrastructure to power AI and high\\-performance computing, addressing the growing demand for scalable energy and compute in the U.S.  \n\n  \n\nWe work at the intersection of finance and technology, helping institutions, startups, and developers navigate a digitally native economy. Led by CEO and Founder Michael Novogratz, our team blends deep crypto expertise with institutional experience and a shared commitment to shaping the future of Web3 and AI.  \n\n  \n\nGalaxy is headquartered in New York City, with offices across North America, Europe, the Middle East, and Asia.  \n\n  \n\nTo learn more about our businesses and products, visit www.galaxy.com.\n\n\n**What We Value:**\n\n\n\nWe are a diverse team of free thinkers, and fast movers united to help investors and creators energize the global economy. We are looking for individuals who thrive in a culture of builders and overachievers and embrace high performance, transparent feedback, and a mission\\-first approach. Our culture shapes our way of working and gets us where we want to be.\n\n\n* *Seek Excellence.*\n* *Be Selective To Be Effective.*\n* *Be Highly Aligned, Loosely Coupled.*\n* *Disagree Transparently.*\n* *Encourage Independent Decision\\-Making.*\n* *Build Dream Teams.*\n**Team Overview**\n\n\n\nThe Applied AI (AI Enablement) team is a newly formed, strategic function focused on accelerating enterprise\\-wide adoption of generative AI technologies. We build the foundatio",
+        "salary": "USD 175,000-220,000/yearly",
+        "site_name": "indeed",
+        "date_posted": "2026-02-27"
+      },
+      {
+        "title": "Python Software Engineer",
+        "company": "NatWest Group",
+        "location": "Bengaluru, Karnataka, India",
+        "url": "https://www.linkedin.com/jobs/view/4369751759",
+        "description": "",
+        "salary": "Not listed",
+        "site_name": "linkedin",
+        "date_posted": "2026-02-27"
+      },
+      {
+        "title": "Python Software Engineer",
+        "company": "NatWest Group",
+        "location": "Chennai, Tamil Nadu, India",
+        "url": "https://www.linkedin.com/jobs/view/4369748866",
+        "description": "",
+        "salary": "Not listed",
+        "site_name": "linkedin",
+        "date_posted": "2026-02-27"
+      },
+      {
+        "title": "Python Software Engineer",
+        "company": "NatWest Group",
+        "location": "Gurugram, Haryana, India",
+        "url": "https://www.linkedin.com/jobs/view/4369764446",
+        "description": "",
+        "salary": "Not listed",
+        "site_name": "linkedin",
+        "date_posted": "2026-02-27"
+      },
+      {
+        "title": "Python Developer",
+        "company": "Infosys",
+        "location": "Bengaluru, Karnataka, India",
+        "url": "https://www.linkedin.com/jobs/view/4323369504",
+        "description": "",
+        "salary": "Not listed",
+        "site_name": "linkedin",
+        "date_posted": "2026-02-26"
+      },
+      {
+        "title": "Python Developer",
+        "company": "Capgemini",
+        "location": "Sion, Maharashtra, India",
+        "url": "https://www.linkedin.com/jobs/view/4378040111",
+        "description": "",
+        "salary": "Not listed",
+        "site_name": "linkedin",
+        "date_posted": "2026-02-25"
+      }
+    ]
+  },
+  "generate fiverr gig for chatbot|remote|20": {
+    "cached_at": "2026-03-01T00:55:47.289047",
+    "jobs": [
+      {
+        "title": "Logistics Project - Operations",
+        "company": "Shopee",
+        "location": "Jakarta, Indonesia",
+        "url": "https://www.linkedin.com/jobs/view/4329340301",
+        "description": "",
+        "salary": "Not listed",
+        "site_name": "linkedin",
+        "date_posted": "2026-02-27"
+      }
+    ]
+  }
+}

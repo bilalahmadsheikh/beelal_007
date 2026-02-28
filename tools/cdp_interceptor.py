@@ -85,7 +85,7 @@ def intercept_linkedin_jobs(search_query: str, max_jobs: int = 20) -> list:
             )
             
             page = context.new_page()
-            stealth.apply_stealth(page)
+            stealth.apply_stealth_sync(page)
             
             # Load stored LinkedIn cookies from SQLite (synced by Chrome Extension)
             _load_stored_cookies(context, "linkedin.com")
