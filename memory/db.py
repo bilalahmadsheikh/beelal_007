@@ -75,7 +75,7 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS cookies (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            site TEXT NOT NULL,
+            site TEXT NOT NULL UNIQUE,
             cookie_data TEXT NOT NULL,
             updated_at TEXT DEFAULT (datetime('now'))
         )
@@ -263,6 +263,53 @@ def get_recent_content(content_type: str = "", limit: int = 10) -> list:
     rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def save_cookies(site: str, cookies: list):
+    """
+    Save cookies for a site (synced from Chrome Extension).
+    
+    Args:
+        site: Domain (e.g. 'linkedin.com')
+        cookies: List of cookie dicts
+    """
+    import json
+    conn = _get_conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        """INSERT INTO cookies (site, cookie_data, updated_at)
+           VALUES (?, ?, datetime('now'))
+           ON CONFLICT(site) DO UPDATE SET
+               cookie_data = excluded.cookie_data,
+               updated_at = datetime('now')""",
+        (site, json.dumps(cookies))
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_cookies(site: str) -> list:
+    """
+    Get stored cookies for a site.
+    
+    Args:
+        site: Domain (e.g. 'linkedin.com')
+        
+    Returns:
+        List of cookie dicts, or empty list if none stored
+    """
+    import json
+    conn = _get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT cookie_data FROM cookies WHERE site = ?", (site,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        try:
+            return json.loads(row["cookie_data"])
+        except (json.JSONDecodeError, TypeError):
+            return []
+    return []
 
 
 if __name__ == "__main__":
