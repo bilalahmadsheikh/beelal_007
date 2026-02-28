@@ -1,0 +1,65 @@
+﻿============================================================
+  BilalAgent v2.0 — Starting Up
+============================================================
+
+[1/4] System RAM: 9.3GB free
+
+[2/4] Initializing database...
+[DB] Database initialized at D:\beelal_007\memory\agent_memory.db
+
+[3/4] Loading profile...
+       Profile: Bilal Ahmad Sheikh (4 projects)
+
+[4/4] Syncing GitHub...
+[GITHUB] Using cached repos (20 repos)
+       Found 20 repos
+
+============================================================
+  Agent Ready
+============================================================
+
+────────────────────────────────────────────────────────────
+Command: "write a linkedin post about IlmSeUrooj"
+────────────────────────────────────────────────────────────
+
+[STEP 1] Routing via Orchestrator (gemma3:1b)...
+  [TIMING] gemma3:1b: TTFT=2.1s | 42 tokens | 13.4 tok/s | keep_alive=5m
+         Routing: {
+  "agent": "content",
+  "task": "write_cover_letter",
+  "model": "qwen3:8b"
+}
+
+[STEP 2] Executing via content agent (model: qwen3:8b)...
+  → LinkedIn post about: ilmseurooj
+[GITHUB] Using cached repos (20 repos)
+  [CONTENT] Matched repo: IlmSeUrooj
+  [CONTENT] Fetching deep context (README + docs/ + commits)...
+[GITHUB] Using cached repos (20 repos)
+[GITHUB] Using cached commits (30 commits)
+[CONTENT] Using Qwen3 8B (primary) — 7.9GB free
+[CONTENT] Using Gemma3 1B (last resort) — 0.7GB free
+  [TIMING] gemma3:1b: TTFT=43.4s | 387 tokens | 27.4 tok/s | keep_alive=5m
+[GITHUB] Using cached repos (20 repos)
+
+────────────────────────────────────────────────────────────
+RESULT:
+────────────────────────────────────────────────────────────
+**Headline:** Bridging Pakistani Student Access to Higher Education – A Deep Dive into UniMatch
+
+**Body:**
+
+UniMatch tackles the critical challenge of facilitating seamless university application for Pakistani students. Traditionally, filling out multiple university portals is a cumbersome, repetitive process. We’ve built a dynamic UI – leveraging Next.js App Router and Supabase, utilizing a robust RLS policy for data isolation – to streamline the process.
+
+**Architecture:**  The core of this project rests on a component-based architecture, featuring a meticulously designed UI with a Swipe-based university discovery system. Key components include: a SwipeCard to handle UI interactions, a Smart Filter System (with tiered selectors), Saved Universities list (using localStorage for persistent data), and Admission Chance Predictor – calculating merit based on official criteria.  The UI leverages a Next.js app router and Supabase to ensure a responsive, user-friendly experience.
+
+**Standout Features:**  We’ve implemented a personalized recommendation system – leveraging saved universities to provide tailored advice – and a Chrome Extension with a robust autofill engine, including 17 universities and an integration with 3-tier selectors, achieving 100% coverage.
+
+🔗 https://github.com/bilalahmadsheikh/IlmSeUrooj
+
+#OpenSource #GitHub #WebDev #BuildInPublic
+
+────────────────────────────────────────────────────────────
+Words: 180 | Chars: 1370
+RAM: 9.3GB → 8.4GB (delta: -1.0GB)
+────────────────────────────────────────────────────────────

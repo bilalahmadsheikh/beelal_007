@@ -152,27 +152,34 @@ def generate_linkedin_post(project_name: str, post_type: str = "project_showcase
     
     instruction = type_instructions.get(post_type, type_instructions["project_showcase"])
     
-    prompt = f"""Write a LinkedIn post about this project. Here is ALL the real data:
+    prompt = f"""Write a technical LinkedIn post about this project. Here is ALL the real data from the repo:
 
 {repo_ctx}
 
 Post type: {post_type}
 {instruction}
 
+STRUCTURE YOUR POST LIKE THIS:
+1. HOOK: Start with the technical problem this project solves (1 line, punchy)
+2. ARCHITECTURE: Name the specific tech stack from the data — frameworks, databases, APIs, patterns. Example: "Next.js App Router + Supabase + RLS policies" NOT "modern web technologies"
+3. STANDOUT FEATURES: Pick 2-3 specific features from the README/FEATURES.md and explain WHY they're technically interesting
+4. WHAT I LEARNED / WHAT'S HARD: One sentence about a technical challenge
+5. REPO LINK: Always end with the GitHub URL from the data above
+6. HASHTAGS: 3-5 relevant technical hashtags
+
 CRITICAL RULES:
-- ONLY mention features, metrics, tech stacks, and details that appear in the data above
-- NEVER invent statistics, user counts, or performance numbers not in the data
-- If the README lists specific features, mention THOSE exact features
-- If docs show architecture or decisions, reference them specifically
-- Strong opening hook (NO generic "Excited to share...")
-- Sound like a real developer sharing their work, NOT AI-generated
-- Use line breaks between sections for readability
-- End with 3-5 relevant hashtags
+- Be DEEPLY TECHNICAL — name exact libraries, patterns, architecture choices from the docs
+- If the docs mention Next.js, Supabase, Chrome Extension, specific algorithms — NAME THEM
+- Include the actual GitHub repo URL from the data
 - MAXIMUM 1300 characters total
-- Write in first person as Bilal Ahmad Sheikh
-- Be conversational, specific, and authentic"""
+- NO preamble like "Here's a draft" — output ONLY the post itself
+- NO generic filler like "super cool" or "really proud" — replace with technical specifics
+- Write as Bilal Ahmad Sheikh, first person"""
 
     result = generate(prompt, content_type="linkedin_post")
+    
+    # Post-processing: strip AI preamble
+    result = _clean_post(result, project_name)
     
     # Enforce character limit
     if len(result) > 1300:
@@ -181,7 +188,54 @@ CRITICAL RULES:
         if last_period > 800:
             result = truncated[:last_period + 1]
     
+    # Ensure repo link is present
+    repo_name = _find_repo_name(project_name) or project_name
+    repo_url = f"https://github.com/bilalahmadsheikh/{repo_name}"
+    if repo_url not in result and "github.com" not in result:
+        result += f"\n\n🔗 {repo_url}"
+    
+    # Ensure hashtags are present
+    if "#" not in result:
+        result += f"\n\n#OpenSource #GitHub #WebDev #BuildInPublic"
+    
     return result
+
+
+def _clean_post(text: str, project_name: str) -> str:
+    """Strip AI preamble and meta-commentary from generated posts."""
+    lines = text.strip().split("\n")
+    clean_lines = []
+    skip_preamble = True
+    
+    for line in lines:
+        lower = line.strip().lower()
+        
+        # Skip known preamble patterns
+        if skip_preamble:
+            if any(p in lower for p in [
+                "here's a", "here is a", "here's the", "okay,", "sure,",
+                "here's a linkedin", "draft for", "crafted in the style",
+                "aiming for", "approximately"
+            ]):
+                continue
+            if lower == "---":
+                continue
+            if lower == "":
+                continue
+            skip_preamble = False
+        
+        # Skip trailing meta-commentary
+        if any(p in lower for p in [
+            "important notes", "considerations:", "to help me refine",
+            "could you share", "here are some"
+        ]):
+            break
+        if lower == "---" and len(clean_lines) > 5:
+            break
+        
+        clean_lines.append(line)
+    
+    return "\n".join(clean_lines).strip()
 
 
 # ─────────────────────────────────────────────────────
