@@ -1,0 +1,29 @@
+Type: project_showcase
+Project: beelal_007
+Hook: Deep dive into beelal_007 — 
+Mode: local
+Generated: 2026-03-01T02:53:37.644704
+Words: 510
+──────────────────────────────────────────────────
+
+**(Image: A mock-up screenshot of the Chrome Extension interface, showcasing the job search dashboard.)**
+
+🤯 **Feeling Overwhelmed by the Pakistani Job Market? You're Not Alone.** 🤯
+
+As a 3rd year AI Engineering student in Pakistan, I’ve seen firsthand the absolute chaos of job searching. Every admission season, I watched my classmates – brilliant, driven individuals – drowning in a sea of job postings, endless applications, and competing for limited spots. It’s a system that feels incredibly inefficient, lacking personalized guidance, and frankly, exhausting. Trying to sift through dozens of job descriptions, tailor applications to hundreds of companies, and constantly update your profile felt like a full-time job *before* you even landed an interview. This project, “beelal_007,” was born out of that frustration – a desire to build something that could actually *streamline* this process.
+
+🚀 **Introducing beelal_007: Your Personalized Job Search Assistant** 🚀
+
+The core idea is a Chrome Extension designed to tackle this overwhelming task. We leveraged a multi-tier model system, utilizing Gemma 3 1B as the orchestrator and specialized Gemma agents for precise tasks, all running within a robust Chrome Extension. At its heart, it’s built on Next.js for a fast, responsive UI, backed by a SQLite database for profile and action logging and powered by a Chromium-based Remote Lambda function for seamless integration. It's built to provide a truly customized experience, dramatically reducing the time and effort required to find the perfect job.
+
+🔎 **Key Features & Technical Details:**
+
+Let's dive into the specifics. The application begins with a startup sequence that initializes the database, loads the user's profile (stored as a YAML config), and synchronizes with GitHub. The user can then generate tailored content – LinkedIn posts, cover letters, and gig descriptions – using Gemma 3 4B for high-quality output. For scoring and analysis, we’ve integrated Phi-4 Mini, and a reliable Gemma 2 9B serves as a fallback. The entire model interaction flows through a `model_runner.py` script with `keep_alive:0` for performance, ensuring near-instantaneous responses. 
+
+The project incorporates a 3-tier model fallback system: Qwen3 8B, Gemma 2 9B, and Gemma3 1B – ensuring consistent performance even under heavy load. We’ve built a comprehensive Job Search Pipeline utilizing CDP (Chrome Debugging Protocol) to intercept LinkedIn Voyager API, bypassing rate limits and enabling stealth scraping of Indeed, Glassdoor, and LinkedIn itself via python-jobspy.  Job scoring is performed by Gemma3:1b against the user’s profile skills (rated 0-100, with keyword matching as a fallback). Critically, we implemented in-memory caching to slash disk reads by a staggering 60x, dramatically speeding up searches.  A SQLite memory table stores the entire profile and action logs, improving query performance.
+
+Furthermore, the Chrome Extension features a CLI approval/edit/cancel interface, currently in its development phase and slated for incorporation in Phase 4. We’ve implemented content logging via SQLite `content_log` table, capturing *every* generated piece of content for tracking and analysis. The application dashboard employs a Kanban-style board, visualizing progress and deadlines. The tool supports the discovery of entry tests, scholarship opportunities, and key deadlines, alongside comparison tools to evaluate different options.
+
+🔗 https://github.com/bilalahmadsheikh/beelal_007
+
+#OpenSource #GitHub #WebDev #BuildInPublic

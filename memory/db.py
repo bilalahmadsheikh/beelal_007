@@ -107,6 +107,15 @@ def init_db():
         )
     """)
     
+    # Phase 6: GitHub state for activity monitoring
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS github_state (
+            key TEXT PRIMARY KEY,
+            value TEXT,
+            updated_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    
     conn.commit()
     conn.close()
     print("[DB] Database initialized at", DB_PATH)

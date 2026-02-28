@@ -1,0 +1,21 @@
+Type: project_showcase
+Project: purchasing_power_ml
+Hook: Deep dive into purchasing_power_ml — ML model for Purchasing Power 
+Mode: local
+Generated: 2026-03-01T02:57:50.199232
+Words: 493
+──────────────────────────────────────────────────
+
+**(Image: A screenshot of the Streamlit app displaying asset grades and a predictive horizon)**
+
+As a 3rd-year AI Engineering student in Pakistan, I constantly witnessed a frustrating reality: predicting university admission chances felt like throwing darts in the dark. Every admission season, students – myself included – desperately sought a way to understand the complex factors influencing their chances, grappling with a flood of information and struggling to discern true potential. It felt like a critical gap existed in accessible, reliable forecasting. That’s why I built `purchasing_power_ml`, a project aimed at providing a data-driven approach to assessing the likelihood of success in Pakistan’s competitive university admissions.
+
+The core idea was to leverage machine learning to analyze historical data and predict an asset's “purchasing power” – essentially, the likelihood of a student receiving admission – across different academic horizons (1 year and 10 years). This project employs a sophisticated automated pipeline leveraging Prefect for workflow orchestration, MLflow for robust model versioning, and GitHub Actions for seamless CI/CD. A key design decision was the use of Leaf-wise growth (best-first) for training, resulting in incredibly fast model training times – a massive relief when dealing with constantly updating data. We're using Next.js under the hood to ensure a smooth user experience, but it’s largely driven by the models and data processing.
+
+Let's dive into the key features. The system grades assets (primarily universities) on a scale of A to D, reflecting their ‘purchasing power’ – A being the strongest, D the weakest – based on 8 regression targets. The model leverages an imbalanced dataset, prioritizing the rare 'A_PRESERVER' class (≥65 points) to ensure strong preservation of purchasing power. A core component is the automated retraining pipeline, scheduled every 15 days using GitHub Actions, triggered by pushes to the `main` or `develop` branches. This CI/CD process, running for roughly 10 minutes after activation, drastically reduces the previous manual effort of 98 minutes. This automation minimizes human error and ensures the model remains consistently accurate. We’ve incorporated a built-in categorical encoding system that efficiently handles the ‘Asset_Category’ feature, streamlining the input data. Memory usage is carefully optimized to ensure a low footprint – crucial for a production deployment. The model predicts purchasing power across a 1Y and 10Y horizon, revealing potential issues driven by aggressive feature adjustments.  The GitHub Actions CI/CD workflow runs no LFS fetches, further boosting speed and reliability. Streamlit is utilized for deployment, again without any LFS downloads impacting the process, creating a truly seamless experience. We've managed to increase the clone time to roughly 1-2 seconds.  The repository size increased by about 50MB to accommodate the models, and the automated pipeline consistently delivers results – currently boasting an average R² of 99.3% across the 8 regression targets. 
+
+The project has evolved through several iterations, documented meticulously via frequent GitHub Actions triggers. We've focused on enhancing the model's predictive accuracy, automating the deployment process, and ensuring the system's robustness.
+
+🔗 https://github.com/bilalahmadsheikh/purchasing_power_ml
+
+#OpenSource #GitHub #WebDev #BuildInPublic

@@ -1,0 +1,28 @@
+Type: project_showcase
+Project: IlmSeUrooj
+Hook: Deep dive into IlmSeUrooj — 
+Mode: local
+Generated: 2026-03-01T02:55:21.139612
+Words: 513
+──────────────────────────────────────────────────
+
+**As a Student in Pakistan, I watched my classmates navigate the daunting world of university admissions – a process that felt both exciting and utterly overwhelming. Every summer, the frantic search for the right program, the right university, took over my days. The competition was fierce, the criteria complex, and the sheer volume of information felt almost impossible to absorb. It wasn't just about getting into a good school; it was about securing a future, a chance to pursue my dreams.**
+
+That’s why I poured my energy into IlmSeUrooj – a project born from a genuine desire to simplify and personalize the university application experience, especially for students in Pakistan.  IlmSeUrooj is a project built to tackle this complexity, offering a focused, streamlined approach to university discovery and application management.
+
+**Our Approach – A Component-Based System**
+
+At its core, IlmSeUrooj is built on a component-based architecture. We’ve adopted Next.js 16+ for a robust and scalable front-end, prioritizing a well-defined App Router pattern. This allows us to build a cohesive user experience, ensuring clear separation of concerns - user interface, data storage, and backend logic are all neatly organized.  We've meticulously selected the Supabase platform – a Postgres-based object storage and database - as our backend, leveraging its reliability and ease of integration. Supabase’s scalable nature is vital for managing the data volume associated with student profiles and application information.  Our choice is rooted in a commitment to data integrity and a desire to deliver a user-friendly experience. The CI/CD pipeline is handled by [link to CI/CD Pipeline] to ensure data freshness and consistent updates.
+
+**The Key Features – A Layered Approach**
+
+Let's dive into the specific features, each meticulously designed to address a core challenge.
+
+*   **Swipe-Based University Discovery:** The foundation of our experience is a stunning swipe-based interface. Users can intuitively scan a list of universities, making quick decisions with one swipe – “Save” to keep them in mind, or “Skip” to bypass them. This instantly adds a layer of discoverability.
+*   **Smart Filter System:**  We’ve built a robust filter system – the “filter” component – allowing students to narrow down their choices by criteria like field of study, degree level, program type, hostel location, city, campus type, and ranking. We implemented a 17-point filter system. This filtering feature is incredibly important for narrowing down options and preventing overwhelm. The filter implementation now incorporates a 3-tier deterministic selector – a reliable predictor of the most likely match for a student's query.
+*   **Saved Universities List:**  A persistent, well-organized list of saved universities is a cornerstone of the experience. We’re utilizing localStorage for this, providing the ability to add notes, reorder, and drag-and-drop, all within a single context.  
+*   **Admission Chance Predictor:** This is where we add some critical predictive power. We’ve implemented a Merit Formula Calculator with projected marks and IBCC support per university – all calculated with the help of a local Ollama.  This system uses an AI field mapping engine – a dynamically updated mapping tool for each university, using a heuristic detection approach.
+
+🔗 https://github.com/bilalahmadsheikh/IlmSeUrooj
+
+#OpenSource #GitHub #WebDev #BuildInPublic

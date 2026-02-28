@@ -317,4 +317,136 @@ if __name__ == "__main__":
     # Test gig logging
     log_gig("fiverr", "mlops", "I will build MLOps pipelines", "draft", price="$20-$130")
     print(f"\nGigs: {len(get_gigs())} total")
+    
+    # Test post logging
+    log_post("project_showcase", "Built an amazing ML pipeline...", "pending_approval", mode="local")
+    print(f"\nPosts: {len(get_posts())} total")
 
+
+# ─────────────────────────────────────────────────
+# Phase 6: LinkedIn post tracking (linkedin_posts.xlsx)
+# ─────────────────────────────────────────────────
+
+POSTS_EXCEL_PATH = os.path.join(PROJECT_ROOT, "memory", "linkedin_posts.xlsx")
+
+
+def _ensure_posts_workbook():
+    """Create the LinkedIn posts Excel workbook with headers if it doesn't exist."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    
+    if os.path.exists(POSTS_EXCEL_PATH):
+        return
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "LinkedIn Posts"
+    
+    headers = ["Date", "Type", "Preview", "Status", "Scheduled", "URL", "Mode"]
+    
+    header_font = Font(name="Calibri", bold=True, color="FFFFFF", size=11)
+    header_fill = PatternFill(start_color="0077B5", end_color="0077B5", fill_type="solid")  # LinkedIn blue
+    header_align = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(
+        left=Side(style="thin"), right=Side(style="thin"),
+        top=Side(style="thin"), bottom=Side(style="thin"),
+    )
+    
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = thin_border
+    
+    widths = [12, 18, 60, 18, 18, 50, 12]
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[chr(64 + i)].width = w
+    
+    ws.freeze_panes = "A2"
+    
+    os.makedirs(os.path.dirname(POSTS_EXCEL_PATH), exist_ok=True)
+    wb.save(POSTS_EXCEL_PATH)
+    print(f"[EXCEL] Created {POSTS_EXCEL_PATH}")
+
+
+def log_post(post_type: str, preview: str, status: str = "pending_approval",
+             scheduled_time: str = "", url: str = "", mode: str = "local") -> None:
+    """
+    Log a LinkedIn post to linkedin_posts.xlsx.
+    
+    Args:
+        post_type: project_showcase, learning_update, opinion, achievement
+        preview: First 100 chars of the post
+        status: pending_approval, approved, posted, rejected
+        scheduled_time: When the post is scheduled for
+        url: LinkedIn post URL (after posting)
+        mode: local, hybrid, web_copilot
+    """
+    from openpyxl import load_workbook
+    from openpyxl.styles import Alignment, Border, Side, PatternFill
+    
+    _ensure_posts_workbook()
+    
+    wb = load_workbook(POSTS_EXCEL_PATH)
+    ws = wb.active
+    
+    row_data = [
+        datetime.now().strftime("%Y-%m-%d"),
+        post_type,
+        preview[:100],
+        status,
+        scheduled_time,
+        url,
+        mode,
+    ]
+    
+    row_num = ws.max_row + 1
+    thin_border = Border(
+        left=Side(style="thin"), right=Side(style="thin"),
+        top=Side(style="thin"), bottom=Side(style="thin"),
+    )
+    
+    # Color by status
+    status_colors = {
+        "pending_approval": PatternFill(start_color="FFEB9C", fill_type="solid"),
+        "approved": PatternFill(start_color="BDD7EE", fill_type="solid"),
+        "posted": PatternFill(start_color="C6EFCE", fill_type="solid"),
+        "rejected": PatternFill(start_color="FFC7CE", fill_type="solid"),
+    }
+    status_fill = status_colors.get(status.lower(), PatternFill())
+    
+    for col_idx, value in enumerate(row_data, 1):
+        cell = ws.cell(row=row_num, column=col_idx, value=value)
+        cell.border = thin_border
+        cell.alignment = Alignment(vertical="center")
+        if col_idx == 4:  # Status column
+            cell.fill = status_fill
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+    
+    wb.save(POSTS_EXCEL_PATH)
+    print(f"[EXCEL] Logged post: [{post_type}] {preview[:50]}... ({status})")
+
+
+def get_posts(status: str = None) -> list:
+    """Get logged LinkedIn posts from Excel."""
+    from openpyxl import load_workbook
+    
+    if not os.path.exists(POSTS_EXCEL_PATH):
+        return []
+    
+    wb = load_workbook(POSTS_EXCEL_PATH)
+    ws = wb.active
+    
+    headers = [cell.value for cell in ws[1]]
+    posts = []
+    
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if not any(row):
+            continue
+        post = dict(zip(headers, row))
+        if status and post.get("Status", "").lower() != status.lower():
+            continue
+        posts.append(post)
+    
+    return posts

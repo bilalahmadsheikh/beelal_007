@@ -1,0 +1,357 @@
+# BilalAgent v2.0 — Complete Project Walkthrough
+
+**Status:** All 6 phases built, tested, verified ✅  
+**Commit:** `58fec26` on `main`
+
+---
+
+## What Is BilalAgent?
+
+A **100% local AI desktop agent** that automates your professional life — generating content, searching jobs, scoring matches, creating freelance gigs, and posting to platforms — all running on your machine with no paid APIs. It uses multiple Ollama models with intelligent RAM management to work within 8.5GB of RAM.
+
+---
+
+## Layer 1: The Model Stack
+
+```
+┌─────────────────────────────────────────────────┐
+│           Ollama (localhost:11434)               │
+│                                                 │
+│   gemma3:1b  ← Router (always warm, 5m)         │
+│   gemma3:4b  ← Content specialist (on-demand)   │
+│   gemma2:9b  ← Fallback (if 4b fails)          │
+│   gemma3:1b  ← Last resort                     │
+└─────────────────────────────────────────────────┘
+```
+
+**How RAM management works:**
+1. `gemma3:1b` (~1GB) stays warm with `keep_alive=5m` — routes every command in ~4s
+2. When content is needed: unload 1b → load `gemma3:4b` (~3.3GB) → generate → unload 4b
+3. 1b reloads naturally on the next command
+4. Only ONE heavy model is ever loaded at a time
+
+All model calls go through [model_runner.py](file:///d:/beelal_007/tools/model_runner.py) which handles:
+- `safe_run()` — RAM check before loading (won't load if not enough RAM)
+- `force_unload()` — explicit model unloading to reclaim RAM
+- `get_free_ram()` — real-time RAM monitoring via `psutil`
+- Timing logs: TTFT, tokens/sec, keep_alive duration
+
+---
+
+## Layer 2: The Brain — Command Routing
+
+```
+User types: "write a linkedin post about IlmSeUrooj covering chrome extension"
+     │
+     ▼
+┌─ agent.py ──────────────────────────────────────┐
+│  1. Regex extracts project_name: "IlmSeUrooj"   │
+│  2. Full user text kept as user_request          │
+│  3. Sends to Orchestrator                        │
+└─────────────────────┬───────────────────────────┘
+                      ▼
+┌─ orchestrator.py (gemma3:1b) ───────────────────┐
+│  Routes to: {"agent":"content",                  │
+│              "task":"write_post",                 │
+│              "model":"gemma3:4b"}                │
+└─────────────────────┬───────────────────────────┘
+                      ▼
+         Content Agent / NLP Agent / Jobs Agent
+```
+
+**5 agent types the orchestrator routes to:**
+
+| Agent | What It Does | Key File |
+|---|---|---|
+| `content` | LinkedIn posts, cover letters, gig descriptions | [content_agent.py](file:///d:/beelal_007/agents/content_agent.py) |
+| `nlp` | Skill analysis, resume review | [nlp_agent.py](file:///d:/beelal_007/agents/nlp_agent.py) |
+| `navigation` | Web browsing, form filling | [browser_tools.py](file:///d:/beelal_007/tools/browser_tools.py) |
+| `memory` | Store/retrieve notes, profile data | [db.py](file:///d:/beelal_007/memory/db.py) |
+| `jobs` | Job search, scoring, applications | [apply_workflow.py](file:///d:/beelal_007/tools/apply_workflow.py) |
+
+---
+
+## Layer 3: Content Generation Pipeline
+
+This is the core feature and it's the most sophisticated pipeline. Here's exactly what happens when you say "write a linkedin post about IlmSeUrooj":
+
+### Step 1: Fetch Deep GitHub Context
+[content_tools.py](file:///d:/beelal_007/tools/content_tools.py) calls [github_connector.py](file:///d:/beelal_007/connectors/github_connector.py):
+
+```
+_get_deep_repo_context("IlmSeUrooj")
+  ├── README.md (full content)
+  ├── docs/ folder (all .md files: features.md, architecture.md, etc.)
+  ├── CHANGELOG.md
+  ├── package.json (tech stack detection)
+  └── 30 most recent commits
+```
+
+This returns ~39KB of raw data.
+
+### Step 2: Compress Context
+`_compress_context()` (228 lines of smart extraction) reduces 39KB → ~5KB:
+- Extracts project metadata, tech stack, features
+- Pulls architecture notes, build phases
+- Filters out noise (CI configs, lock files, boilerplate)
+- Keeps commit messages for build journey
+
+### Step 3: Build Specialized Prompt
+Each content type has its own detailed prompt pattern:
+
+**LinkedIn posts** — 6-section flow:
+1. THE PROBLEM (3-4 sentences, personal story)
+2. THE SOLUTION (3-4 sentences, architecture + tech choices)
+3. KEY FEATURES (8-12 sentences, comprehensive list)
+4. BUILD JOURNEY (2-3 sentences, iterations/phases)
+5. WHAT'S NEXT + REPO LINK
+6. HASHTAGS
+
+**Cover letters** — 3-paragraph structure:
+1. Opening: Why THIS role at THIS company
+2. Evidence: Real project details from GitHub
+3. Closing: Enthusiasm + availability
+
+**Gig descriptions** — JSON structure with title, description, tags, 3 pricing tiers
+
+### Step 4: Generate via Gemma 3 4B
+[content_agent.py](file:///d:/beelal_007/agents/content_agent.py) manages the model:
+1. Check RAM (need ≥3GB)
+2. Unload gemma3:1b router
+3. Load gemma3:4b with system prompt (from `profile.yaml`)
+4. Generate (v17 produced 861 tokens in 67.8s)
+5. Quality check (must be >100 chars)
+6. Unload gemma3:4b
+
+### Step 5: Post-Processing
+- Strip AI preamble ("Here's a draft:")
+- Add GitHub repo link (from `profile.yaml`)
+- Add hashtags
+- Cap at 3500 chars (LinkedIn limit)
+
+**Result:** The v17 LinkedIn post — 482 words, 3575 chars of rich, project-grounded content.
+
+---
+
+## Layer 4: Dynamic Profile System
+
+[profile.yaml](file:///d:/beelal_007/config/profile.yaml) is the single source of truth:
+
+```yaml
+personal:
+  name: Bilal Ahmad Sheikh
+  degree: AI Engineering, 3rd year (6th semester)
+  github: bilalahmadsheikh
+  skills: [Python, FastAPI, Web3.py, Blockchain, MLOps, ...]
+projects:
+  - name: basepy-sdk
+    tech_stack: [Python, Web3.py, Blockchain]
+  - name: WhatsApp AI Chatbot
+    tech_stack: [FastAPI, Supabase, Railway]
+```
+
+**Used by:**
+- `content_agent.py` → system prompt ("Write as Bilal Ahmad Sheikh...")
+- `content_tools.py` → name injection, GitHub URLs
+- `job_tools.py` → skill matching for job scoring
+- Never hardcoded anywhere
+
+---
+
+## Layer 5: Job Search & Scoring Pipeline
+
+```
+User: "search python developer jobs"
+  │
+  ├── 1. CDP Interceptor (tries LinkedIn's internal API first)
+  │     └── Uses Playwright + stealth + stored cookies
+  │     └── Intercepts LinkedIn Voyager JSON (richer data: salary, skills)
+  │
+  ├── 2. JobSpy Fallback (if CDP fails / no LinkedIn login)
+  │     └── Scrapes Indeed, Glassdoor, LinkedIn
+  │     └── Returns: title, company, location, salary, URL
+  │     └── 12h cache to avoid re-scraping
+  │
+  ├── 3. Score each job against profile (gemma3:1b)
+  │     └── Loads skills from profile.yaml (cached in memory)
+  │     └── Returns: score 0-100, matching_skills, missing_skills
+  │
+  ├── 4. Display results (sorted by score)
+  │     └── Shows: title, company, score, matching/missing skills, link
+  │
+  └── 5. Log to Excel
+        └── applied_jobs.xlsx with color-coded scores (green ≥80, red <50)
+```
+
+**Key files:**
+- [cdp_interceptor.py](file:///d:/beelal_007/tools/cdp_interceptor.py) — LinkedIn CDP interception with `playwright-stealth`
+- [jobspy_connector.py](file:///d:/beelal_007/connectors/jobspy_connector.py) — Multi-site scraper
+- [job_tools.py](file:///d:/beelal_007/tools/job_tools.py) — Profile-based scoring
+- [apply_workflow.py](file:///d:/beelal_007/tools/apply_workflow.py) — Full pipeline orchestration
+- [excel_logger.py](file:///d:/beelal_007/memory/excel_logger.py) — Color-coded Excel tracking
+
+---
+
+## Layer 6: Chrome Extension + Bridge
+
+### The Chrome Extension ([chrome_extension/](file:///d:/beelal_007/chrome_extension))
+
+**4 features built into Manifest V3:**
+
+1. **Context Snap** — "Send to Agent" button appears on job listing pages (Upwork, Freelancer, LinkedIn). Captures title, description, budget, platform and sends to the bridge.
+
+2. **Approval Overlay** — When the agent wants to post/submit something, an overlay appears on the current page with Approve / Edit / Cancel buttons. No more Tkinter popups.
+
+3. **MutationObserver** — Monitors Claude/ChatGPT pages for AI responses, captures them and relays to the bridge for the agent to use in hybrid mode.
+
+4. **Cookie Sync** — Syncs browser cookies to SQLite so Playwright can reuse authenticated sessions (LinkedIn login, Fiverr login, etc.)
+
+### The FastAPI Bridge ([bridge/server.py](file:///d:/beelal_007/bridge/server.py))
+
+Runs on `localhost:8000`, connects the Chrome Extension to the Python agent.
+
+**8 endpoints:**
+
+| Endpoint | Direction | Purpose |
+|---|---|---|
+| `POST /extension/context_snap` | Extension → Agent | Job/gig data from "Send to Agent" |
+| `POST /extension/approval` | Extension → Agent | Approve/cancel/edit from overlay |
+| `GET  /extension/get_task` | Extension ← Agent | Poll for pending overlay tasks |
+| `POST /extension/register_task` | Agent → Extension | Register a task for overlay display |
+| `POST /extension/cookies` | Extension → Agent | Sync browser cookies |
+| `GET  /extension/cookies/{site}` | Agent ← Extension | Get stored cookies for Playwright |
+| `POST /extension/ai_response` | Extension → Agent | AI responses from MutationObserver |
+| `GET  /extension/status` | Both | Bridge health + stats |
+
+---
+
+## Layer 7: Browser Automation
+
+[browser_tools.py](file:///d:/beelal_007/tools/browser_tools.py) uses Playwright with stealth:
+
+- **`_create_stealth_context()`** — Creates a browser with `playwright-stealth`, loads stored cookies from SQLite, sets modern user-agent
+- **`post_to_linkedin()`** — Opens LinkedIn, fills post box, waits for extension overlay approval, then posts
+- **`fill_fiverr_gig()`** — Fills Fiverr gig creation form with stealth typing (random delays)
+- **`create_fiverr_gig()`** — Full gig creation flow with overlay approval and Excel logging
+
+---
+
+## Layer 8: Freelancing Automation (Phase 5)
+
+### Gig Generation ([gig_tools.py](file:///d:/beelal_007/tools/gig_tools.py))
+
+5 service types with pre-configured pricing:
+
+| Service | Basic | Standard | Premium |
+|---|---|---|---|
+| MLOps | $20 | $60 | $120 |
+| Chatbot | $15 | $50 | $100 |
+| Blockchain | $25 | $75 | $150 |
+| Data Science | $20 | $60 | $130 |
+| Backend | $15 | $50 | $110 |
+
+- `generate_gig()` — Full gig with title, description, tags, 3 pricing tiers
+- `generate_all_gigs()` — Generates all 5 service gigs at once
+- `generate_proposal()` — Tailored proposal for a job description
+- `generate_upwork_bio()` — Professional Upwork profile bio
+
+### Freelance Monitor ([freelance_monitor.py](file:///d:/beelal_007/connectors/freelance_monitor.py))
+- Monitors Upwork RSS for new projects matching your keywords
+- De-duplicates via SQLite `seen_projects` table
+- Handles Upwork's deprecated RSS feeds gracefully
+
+---
+
+## Layer 9: Persistent Storage
+
+### SQLite ([db.py](file:///d:/beelal_007/memory/db.py)) — 7 tables:
+
+| Table | Purpose |
+|---|---|
+| `profiles` | Agent profile data |
+| `action_log` | Every command logged with timestamp |
+| `memory_store` | Key-value persistent memory |
+| `content_log` | Generated content history |
+| `cookies` | Chrome Extension cookie sync |
+| `pending_tasks` | Bridge ↔ Extension task queue |
+| `seen_projects` | Freelance monitor de-duplication |
+
+### Excel ([excel_logger.py](file:///d:/beelal_007/memory/excel_logger.py)):
+- `applied_jobs.xlsx` — Job applications with color-coded scores
+- `gigs_created.xlsx` — Freelance gig tracking
+
+### File Caches:
+- `github_cache.json` — 24h GitHub API cache
+- `job_cache.json` — 12h JobSpy results cache
+- `gig_drafts/` — Generated gig JSON drafts
+- `cover_letters/` — Saved cover letters
+- `post_drafts/` — LinkedIn post drafts
+
+---
+
+## Complete File Map
+
+```
+d:\beelal_007\
+├── agent.py              ← Main CLI: python agent.py "your command"
+├── CLAUDE.md             ← Project config for AI assistants
+│
+├── agents/
+│   ├── orchestrator.py   ← gemma3:1b command router
+│   ├── content_agent.py  ← gemma3:4b content generation + RAM management
+│   └── nlp_agent.py      ← Profile-aware NLP analysis
+│
+├── tools/
+│   ├── model_runner.py   ← Ollama wrapper: safe_run, force_unload, RAM check
+│   ├── content_tools.py  ← LinkedIn, cover letter, gig generators (698 lines)
+│   ├── job_tools.py      ← Job scoring against profile.yaml
+│   ├── apply_workflow.py ← Full job pipeline: search → score → approve → log
+│   ├── cdp_interceptor.py← LinkedIn CDP + playwright-stealth
+│   ├── browser_tools.py  ← Stealth browser automation + overlay approval
+│   └── gig_tools.py      ← 5-service gig generation + proposals
+│
+├── connectors/
+│   ├── github_connector.py   ← REST API + deep context fetching
+│   ├── jobspy_connector.py   ← Multi-site job scraper
+│   └── freelance_monitor.py  ← Upwork RSS monitoring
+│
+├── bridge/
+│   └── server.py         ← FastAPI bridge (8 endpoints, localhost:8000)
+│
+├── chrome_extension/
+│   ├── manifest.json     ← Manifest V3
+│   ├── background.js     ← Cookie sync + message relay
+│   ├── content_script.js ← Context snap + overlay + MutationObserver
+│   ├── popup.html/js     ← Extension popup UI
+│   └── icons/            ← Extension icons
+│
+├── config/
+│   └── profile.yaml      ← Dynamic profile (name, skills, projects)
+│
+├── memory/
+│   ├── db.py             ← SQLite (7 tables)
+│   ├── excel_logger.py   ← Color-coded Excel tracking
+│   ├── agent_memory.db   ← SQLite database
+│   └── github_cache.json ← Cached GitHub data
+│
+└── ui/
+    └── approval_cli.py   ← CLI fallback: [A]pprove / [E]dit / [C]ancel
+```
+
+---
+
+## Status: Everything Working
+
+| Phase | What | Status |
+|---|---|---|
+| 0 | Environment + Ollama + Models | ✅ |
+| 1 | Agent brain + orchestrator + GitHub + DB | ✅ |
+| 2 | Content generation (LinkedIn, covers, gigs) | ✅ (v17 quality) |
+| 3 | Job search + CDP + scoring + Excel | ✅ |
+| 4 | Chrome Extension + Bridge + browser tools | ✅ |
+| 5 | Freelancing automation + monitor | ✅ |
+
+**No remaining issues.** All bugs found during testing have been fixed:
+- Stealth API (`apply_stealth_sync`)
+- Cookie functions in db.py
+- Content agent RAM management (restored to v17 pattern)

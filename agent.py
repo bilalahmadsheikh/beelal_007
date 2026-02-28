@@ -157,17 +157,22 @@ def handle_command(user_input: str, profile: dict):
     print(f"\n[STEP 2] Executing via {agent_name} agent (model: {model})...")
     
     if agent_name == "content":
-        # Check if this is a freelance command first
-        freelance_result = _try_freelance(user_input)
-        if freelance_result is not None:
+        # Check Phase 6 brand/scheduling commands first
+        brand_result = _try_brand(user_input)
+        if brand_result is not None:
+            result = brand_result
+        # Then check Phase 5 freelance commands
+        elif (freelance_result := _try_freelance(user_input)) is not None:
             result = freelance_result
         else:
             result = _handle_content(user_input, task)
     
     elif agent_name == "nlp":
-        # Check if freelance command was misrouted to NLP
-        freelance_result = _try_freelance(user_input)
-        if freelance_result is not None:
+        # Check if brand/freelance command was misrouted to NLP
+        brand_result = _try_brand(user_input)
+        if brand_result is not None:
+            result = brand_result
+        elif (freelance_result := _try_freelance(user_input)) is not None:
             result = freelance_result
         else:
             # Always include GitHub data
@@ -266,6 +271,81 @@ def _handle_jobs(user_input: str, task: str) -> str:
     print(f"  → Job search: '{query}' in '{location}'")
     
     return run_job_search(query, location)
+
+
+def _try_brand(user_input: str):
+    """
+    Check if user_input is a Phase 6 brand/scheduling command. Returns result or None.
+    Handles: weekly post generation, brand check, github activity, hybrid refine.
+    """
+    lower = user_input.lower()
+    
+    # Generate weekly posts
+    if any(kw in lower for kw in [
+        "generate weekly posts", "schedule posts", "weekly posts",
+        "generate posts", "brand posts", "linkedin posts",
+    ]):
+        from tools.post_scheduler import generate_weekly_posts
+        
+        mode = "local"
+        if "hybrid" in lower:
+            mode = "hybrid"
+        elif "web_copilot" in lower or "copilot" in lower:
+            mode = "web_copilot"
+        
+        posts = generate_weekly_posts(mode=mode)
+        
+        if posts:
+            summary_lines = [f"\n📝 Generated {len(posts)} weekly posts (mode: {mode}):\n"]
+            for i, p in enumerate(posts, 1):
+                summary_lines.append(f"  {i}. [{p['type']}] {p['project']} — {p['words']} words")
+                summary_lines.append(f"     Saved: {p['path']}")
+                summary_lines.append(f"     Preview: {p['final'][:120]}...")
+            return "\n".join(summary_lines)
+        return "No posts generated — check GitHub activity."
+    
+    # Brand check / GitHub activity
+    if any(kw in lower for kw in [
+        "brand check", "github activity", "activity check",
+        "content ideas", "post ideas", "what to post",
+    ]):
+        from connectors.github_monitor import GitHubActivityMonitor
+        
+        monitor = GitHubActivityMonitor()
+        activities = monitor.check_new_activity()
+        ideas = monitor.get_content_ideas()
+        
+        lines = [f"\n📊 GitHub Activity Report:\n  {len(activities)} changes detected\n"]
+        
+        for a in activities[:5]:
+            lines.append(f"  • [{a['type']}] {a['description']}")
+        
+        lines.append(f"\n💡 Content Ideas ({len(ideas)}):\n")
+        for i, idea in enumerate(ideas, 1):
+            lines.append(f"  {i}. [{idea['type']}] {idea['project']}")
+            lines.append(f"     Hook: {idea['hook'][:80]}")
+        
+        return "\n".join(lines)
+    
+    # Hybrid refine
+    if "hybrid refine" in lower or "refine post" in lower:
+        from tools.post_scheduler import hybrid_refine
+        
+        # Extract text after the command keyword
+        text = user_input
+        for pattern in ["hybrid refine", "refine post"]:
+            idx = lower.find(pattern)
+            if idx >= 0:
+                text = user_input[idx + len(pattern):].strip()
+                break
+        
+        if len(text) < 20:
+            return "Please provide the post text to refine: 'hybrid refine <your post text>'"
+        
+        result = hybrid_refine(text)
+        return f"\n📝 Hybrid Refined Post:\n{'─' * 50}\n{result}\n{'─' * 50}"
+    
+    return None
 
 
 def _try_freelance(user_input: str):

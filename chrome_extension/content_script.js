@@ -289,12 +289,15 @@
                 if (responseText && responseText !== lastResponseText && !stopBtn) {
                     lastResponseText = responseText;
 
+                    // Use task_id set by Playwright (hybrid mode) if available
+                    const taskId = window.__bilalAgentTaskId || '';
+
                     chrome.runtime.sendMessage({
                         type: 'ai_response',
                         data: {
                             source: source,
                             response_text: responseText.slice(0, 5000),
-                            task_id: ''
+                            task_id: taskId
                         }
                     });
 
