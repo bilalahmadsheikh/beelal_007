@@ -2,8 +2,8 @@
 
 ## tools/model_runner.py
 
-### `run_model(model, prompt, system="") → str`
-Run an Ollama model with `keep_alive:0` (auto-unload after generation).
+### `run_model(model, prompt, system="", keep_alive=None) → str`
+Run an Ollama model with tiered `keep_alive` for KV caching. Router uses `5m`, specialists use `30s`.
 
 | Param | Type | Description |
 |---|---|---|
@@ -55,20 +55,22 @@ Run NLP analysis using profile data and optional context.
 ## agents/content_agent.py
 
 ### `generate(prompt, content_type="general") → str`
-Generate content using best available model (Qwen3 8B → Gemma 2 9B → Gemma3 1B fallback). Strips Qwen3 `<think>` tags. Auto-retries if output < 150 chars.
+Generate content using best available model (Gemma 3 4B → Gemma 2 9B → Gemma3 1B). System prompt built dynamically from `config/profile.yaml`. Auto-retries if output < 150 chars. Explicitly unloads specialist after generation.
 
 ---
 
 ## tools/content_tools.py
 
-### `generate_linkedin_post(project_name, post_type="project_showcase") → str`
-Max 1300 chars. Types: `project_showcase`, `learning_update`, `achievement`, `opinion`.
+### `generate_linkedin_post(project_name, post_type="project_showcase", user_request="") → str`
+Max ~3500 chars. Types: `project_showcase`, `learning_update`, `achievement`, `opinion`. Profile name loaded dynamically.
 
-### `generate_cover_letter(job_title, company, job_description="") → str`
-3-paragraph cover letter, 250-350 word target.
+### `generate_cover_letter(job_title, company, job_description="", user_request="") → str`
+3-paragraph cover letter, 250-350 word target. Profile name/degree loaded dynamically.
 
-### `generate_gig_description(service_type, platform="fiverr") → dict`
+### `generate_gig_description(service_type, platform="fiverr", user_request="") → dict`
 JSON with title, description, tags, packages. Services: `mlops`, `chatbot`, `blockchain`, `data_science`, `backend`.
+
+All generators accept `user_request` — the full user input is injected into the prompt as `USER'S REQUEST:` to honor custom instructions.
 
 ---
 

@@ -84,9 +84,17 @@ pip install python-dotenv pyyaml
 
 ### Request timeout
 
-**Error:** `[ERROR] Ollama request timed out (120s).`
+**Error:** `[ERROR] Ollama request timed out (300s).`
 
-**Fix:** Large prompts on slow machines can exceed 120s. Try a shorter prompt or check if another model is using RAM.
+**Fix:**
+1. The default timeout is 300 seconds. Large prompts on slow machines can approach this limit.
+2. Check if another model is consuming RAM: `ollama ps`
+3. Force unload stuck models:
+   ```python
+   from tools.model_runner import force_unload, unload_all_specialists
+   unload_all_specialists()  # Unloads all specialists, keeps router
+   ```
+4. Try a shorter prompt or reduce context size.
 
 ---
 

@@ -2,69 +2,59 @@
 
 ## Active Models
 
-| Model | Ollama Name | Size | RAM Usage | Role | Status |
-|---|---|---|---|---|---|
-| Gemma 3 1B | `gemma3:1b` | ~815 MB | ~1 GB | Orchestrator + NLP fallback | ✅ Installed & Tested |
-| Gemma 3 4B | `gemma3:4b` | ~3.3 GB | ~3.3 GB | Content Primary | ✅ Installed |
-| Gemma 2 9B | `gemma2:9b` | ~5.4 GB | ~6 GB | Content Fallback | ⬜ Optional |
-| Phi-4 Mini | `phi4-mini` | ~2.5 GB | ~3 GB | Logic / Scoring | ⬜ Optional |
+| Model | Ollama Name | Size | RAM Usage | Role | keep_alive | Status |
+|---|---|---|---|---|---|---|
+| Gemma 3 1B | `gemma3:1b` | ~815 MB | ~1 GB | Orchestrator + NLP | `5m` (always warm) | ✅ Installed |
+| Gemma 3 4B | `gemma3:4b` | ~3.3 GB | ~3.3 GB | Content Primary | `30s` + explicit unload | ✅ Installed |
+| Gemma 2 9B | `gemma2:9b` | ~5.4 GB | ~6 GB | Content Fallback | `30s` | ⬜ Optional |
+| Phi-4 Mini | `phi4-mini` | ~2.5 GB | ~3 GB | Logic / Scoring | `30s` | ⬜ Optional |
 
-## Two-Tier System (Phase 1)
+## Two-Tier System
 
-### Tier 1: Orchestrator (Always First)
+### Tier 1: Orchestrator (Always Warm)
 - **Gemma 3 1B** routes every command
 - Output: JSON `{"agent", "task", "model"}`
-- RAM: ~1GB, fast loading
-- Called via `safe_run("gemma3:1b", prompt, required_gb=0.5)`
+- `keep_alive=5m` — stays warm for fast routing (1-2s TTFT on cache hit)
+- KV cache reused when system prompt matches
 
-### Tier 2: Specialist (On-Demand)
-- **Phi-4 Mini** for complex analysis, scoring, structured tasks
-- **Qwen3 8B** for writing, cover letters, proposals
+### Tier 2: Specialists (On-Demand)
+- **Gemma 3 4B** for writing, cover letters, proposals (~10 tok/s, 54s TTFT on 5KB prompts)
+- **Phi-4 Mini** for scoring, analysis
 - **Gemma 2 9B** as reliable fallback
-- All load on-demand, unload immediately via `keep_alive:0`
+- `keep_alive=30s` — short window for follow-up calls
+- Explicitly unloaded via `force_unload()` after generation completes
 
-## RAM Budget
+## RAM Management
 
-**Total system RAM:** ~8 GB (varies)
-**Usable for models:** ~4-5 GB (OS + apps take the rest)
+**Total system RAM:** ~8.5 GB  
+**Usable for models:** ~4-7 GB (depends on other apps)
 
-**Rule:** Only ONE heavy model loaded at a time. Orchestrator (1B) can coexist briefly.
+**Rules:**
+- Only ONE specialist loaded at a time
+- Router unloaded before loading specialist (`force_unload("gemma3:1b")`)
+- Specialist unloaded after generation (`force_unload("gemma3:4b")`)
+- `safe_run()` checks RAM before loading, auto-unloads if needed
 
-**Observed in testing:**
-- Before model call: 2.6GB free
-- During model call: ~1.4GB free (model loaded)
-- After keep_alive:0 unload: RAM recovers
+**Observed in v16 test:**
+- Before: 7.6GB free → Load gemma3:4b → During: 2.1GB free → After unload: RAM recovers
 
-## keep_alive:0 Strategy
-
-Every Ollama API call includes `"keep_alive": 0` via `safe_run()`:
-
-```python
-# ALL agent code MUST use safe_run() — never call Ollama directly
-from tools.model_runner import safe_run
-
-result = safe_run(
-    model="gemma3:1b",
-    prompt="classify this command",
-    required_gb=0.5,  # RAM gate
-    system="You are a router."
-)
-```
-
-## Model Fallback Chain
+## Fallback Chain
 
 ```
-Requested model (e.g. phi4-mini)
-  → Check RAM via get_free_ram()
-    → Enough RAM? → Load and run
-    → Not enough? → Fall back to gemma3:1b
+Gemma 3 4B (primary, 3.0GB required)
+  → Success? Return result + unload
+  → Error or too short? Retry once
+  → Still failing?
+    → Gemma 2 9B (fallback, 6.0GB required)
+    → Still failing?
+      → Gemma 3 1B (last resort, 0.5GB required)
 ```
 
 ## Download Commands
 
 ```bash
-ollama pull gemma3:1b     # Phase 0 — ✅ installed
-ollama pull gemma3:4b        # Phase 1+ — for content generation
-ollama pull gemma2:9b     # Optional fallback
-ollama pull phi4-mini     # Optional for scoring
+ollama pull gemma3:1b     # Required — orchestrator
+ollama pull gemma3:4b     # Required — content generation
+ollama pull gemma2:9b     # Optional — fallback
+ollama pull phi4-mini     # Optional — scoring
 ```

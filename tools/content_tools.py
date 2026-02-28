@@ -374,6 +374,10 @@ def generate_linkedin_post(project_name: str, post_type: str = "project_showcase
         
     Returns:
         LinkedIn post text (with hashtags)"""
+    # Load profile for dynamic name injection
+    profile = _load_profile()
+    profile_name = profile.get("personal", {}).get("name", "the developer")
+    
     # Fetch DEEP repo data (README + docs/ + commits + metadata)
     repo_ctx = _get_deep_repo_context(project_name)
     
@@ -430,7 +434,7 @@ CRITICAL RULES:
 - Write detailed paragraphs, NOT bullet points
 - NO preamble like "Here's a draft" — output ONLY the post itself
 - Include the actual GitHub repo URL
-- Write as Bilal Ahmad Sheikh, first person"""
+- Write as {profile_name}, first person"""
 
     result = generate(prompt, content_type="linkedin_post")
     
@@ -444,9 +448,11 @@ CRITICAL RULES:
         if last_period > 2500:
             result = truncated[:last_period + 1]
     
-    # Ensure repo link is present
+    # Ensure repo link is present (dynamic from profile)
+    profile = _load_profile()
+    github_user = profile.get("personal", {}).get("github", "bilalahmadsheikh")
     repo_name = _find_repo_name(project_name) or project_name
-    repo_url = f"https://github.com/bilalahmadsheikh/{repo_name}"
+    repo_url = f"https://github.com/{github_user}/{repo_name}"
     if repo_url not in result and "github.com" not in result:
         result += f"\n\n🔗 {repo_url}"
     
@@ -520,6 +526,11 @@ def generate_cover_letter(job_title: str, company: str, job_description: str = "
     else:
         project_ctx = _get_github_context()
     
+    # Load profile for dynamic name injection
+    profile = _load_profile()
+    profile_name = profile.get("personal", {}).get("name", "the developer")
+    profile_degree = profile.get("personal", {}).get("degree", "")
+    
     prompt = f"""Write a cover letter for this position:
 
 Job Title: {job_title}
@@ -544,8 +555,8 @@ CRITICAL RULES:
 - 250-350 words STRICTLY
 - Sound professional but warm, like a real human wrote it
 - NO generic phrases like "I am writing to express my interest"
-- Write as Bilal Ahmad Sheikh, AI Engineering student (3rd year, 6th semester)
-- Sign off: "Best regards, Bilal Ahmad Sheikh"
+- Write as {profile_name}, {profile_degree}
+- Sign off: "Best regards, {profile_name}"
 
 USER'S REQUEST: "{user_request}"
 Honor the user's specific instructions above if any.

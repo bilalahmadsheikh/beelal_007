@@ -13,11 +13,13 @@
 - And more...
  
 ## v2.0 Architecture
-- Orchestrator: Gemma 3 1B (always on, 1GB RAM only, routes every command)
-- Content Primary: Qwen3 8B (best 2025 output, hybrid thinking mode)
+- Orchestrator: Gemma 3 1B (always warm, keep_alive=5m, routes every command)
+- Content Primary: Gemma 3 4B (best 4B content model, same family as orchestrator)
 - Content Fallback: Gemma 2 9B (reliable, well-tested alternative)
 - Logic/Scoring: Phi-4 Mini Instruct (load on demand for job scoring and routing)
-- All model calls use keep_alive:0 (load -> generate -> unload immediately)
+- Tiered keep_alive: Router=5m, Specialists=30s + explicit force_unload after generation
+- Dynamic profile: All prompts read from config/profile.yaml (name, degree, GitHub)
+- User prompt passthrough: Full user input passed as user_request to all generators
 - Chrome Extension at D:\beelal_007\chrome_extension\ (Manifest V3)
 - FastAPI bridge at localhost:8000 (connects extension to Python)
 - Intelligence Modes: local / web_copilot / hybrid
@@ -25,8 +27,8 @@
  
 ## Rules
 - All files in D:\beelal_007\
-- Models in D:\local_models\
+- Models served via Ollama (ollama pull gemma3:1b, ollama pull gemma3:4b)
 - Github Repo: https://github.com/bilalahmadsheikh/beelal_007
 - NEVER submit any form without approval
 - No paid APIs — free/local only
-- keep_alive:0 on EVERY model call
+- All model calls through safe_run() — never call Ollama directly

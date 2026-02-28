@@ -85,8 +85,8 @@ def _parse_content_command(user_input: str) -> dict | None:
     
     # LinkedIn post detection
     linkedin_patterns = [
-        r"(?:write|create|generate|make)\s+(?:a\s+)?linkedin\s+post\s+(?:about|for|on)\s+(.+)",
-        r"linkedin\s+post\s+(?:about|for|on)\s+(.+)",
+        r"(?:write|create|generate|make)\s+(?:a\s+)?linkedin\s+post\s+(?:about|for|on)\s+(\S+)",
+        r"linkedin\s+post\s+(?:about|for|on)\s+(\S+)",
     ]
     for pat in linkedin_patterns:
         m = re.search(pat, lower)

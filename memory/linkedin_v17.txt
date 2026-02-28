@@ -1,0 +1,75 @@
+﻿============================================================
+  BilalAgent v2.0 — Starting Up
+============================================================
+
+[1/4] System RAM: 7.9GB free
+
+[2/4] Initializing database...
+[DB] Database initialized at D:\beelal_007\memory\agent_memory.db
+
+[3/4] Loading profile...
+       Profile: Bilal Ahmad Sheikh (4 projects)
+
+[4/4] Syncing GitHub...
+[GITHUB] Using cached repos (20 repos)
+       Found 20 repos
+
+============================================================
+  Agent Ready
+============================================================
+
+────────────────────────────────────────────────────────────
+Command: "write a linkedin post about IlmSeUrooj covering the chrome extension autofill engine"
+────────────────────────────────────────────────────────────
+
+[STEP 1] Routing via Orchestrator (gemma3:1b)...
+  [TIMING] gemma3:1b: TTFT=4.1s | 42 tokens | 10.5 tok/s | keep_alive=5m
+         Routing: {
+  "agent": "content",
+  "task": "write_cover_letter",
+  "model": "gemma3:4b"
+}
+
+[STEP 2] Executing via content agent (model: gemma3:4b)...
+  → LinkedIn post about: ilmseurooj
+[GITHUB] Using cached repos (20 repos)
+  [CONTENT] Matched repo: IlmSeUrooj
+  [CONTENT] Fetching deep context (README + docs/ + commits)...
+[GITHUB] Using cached repos (20 repos)
+[GITHUB] Using cached commits (30 commits)
+  [CONTENT] Context compressed: 39697 → 5045 chars
+  [UNLOAD] gemma3:1b freed from RAM
+[CONTENT] Using Gemma 3 4B (primary) — 7.9GB free
+  [TIMING] gemma3:4b: TTFT=67.8s | 861 tokens | 10.1 tok/s | keep_alive=30s
+  [UNLOAD] gemma3:4b freed from RAM
+[GITHUB] Using cached repos (20 repos)
+
+────────────────────────────────────────────────────────────
+RESULT:
+────────────────────────────────────────────────────────────
+**(Image: A sleek mockup of the IlmSeUrooj Chrome extension in action, showing a university profile with autofill in progress)**
+
+**Navigating Pakistan’s Competitive Admissions – It’s a Nightmare. Let’s Fix It.**
+
+As a 3rd-year AI Engineering student in Pakistan, I’ve witnessed firsthand the sheer frustration surrounding university admissions. Seriously, every single year, students – myself included – are drowning in a sea of data, deadlines, and complex entry requirements. Trying to manually compare universities, track application statuses, and wrestle with complicated scoring systems? It’s exhausting, time-consuming, and frankly, intimidating. It’s a critical bottleneck preventing students from confidently pursuing their academic goals.
+
+**Introducing IlmSeUrooj: A Unified Platform Built for Pakistan’s Future**
+
+IlmSeUrooj (meaning “Plan of Knowledge”) is a web application and accompanying Chrome extension designed to streamline the entire university selection process. Built with a focus on accessibility and intelligent data aggregation, it tackles this problem head-on. We’ve leveraged Next.js for a blazing-fast, server-side rendered experience, coupled with Supabase for a robust, real-time database and RLS (Role-Based Access Control) to ensure data privacy – specifically, students can only edit their own profiles. The core architecture centers around a component-based approach with a clear separation of concerns, driving a consistent user experience across all features. 
+
+**Key Features: A Deep Dive**
+
+Let’s get into the details. IlmSeUrooj isn’t just a collection of university lists; it’s a powerful tool packed with features like a swipe-based university discovery system (yes, like Tinder!), a smart filter system supporting 17 dimensions including field, degree level, hostel, and city, and a persistent saved universities list with drag-and-drop reordering and tagging.  We’ve built a sophisticated admission chance predictor that utilizes a merit formula calculator and incorporates projected/IBCC support per university – offering a data-driven perspective on potential success. Users can leverage a university comparison tool to directly compare up to 4 institutions side-by-side. The application dashboard employs a Kanban board to visually track application progress through stages: Saved, Applying, Submitted, and Decision.
+
+But the real innovation lies within the Chrome extension. We’ve engineered a robust 3-tier autofill engine utilizing a deterministic selector system, followed by AI field mapping leveraging Ollama, and finally, a heuristic detection layer – currently configured for 17 universities with fully mapped CSS selectors, and continuously undergoing live verification. This ensures incredibly fast and accurate form filling across login pages, registration forms, and applications.  Beyond autofill, the extension includes a sidebar with 7 states – handling unknowns intelligently – a robust password vault, a pre-submit validator for data consistency, submission detection, and, uniquely, an answer memory feature to remember answers across different universities. Finally, we've integrated an AI-powered SOP/essay draft helper that generates initial drafts based on local Ollama models, requiring just a 20-character edit minimum to refine.
+
+The project evolved through 9 distinct iterations, starting with core swipe functionality and culminating in a fully functional Chrome extension with its complex autofill engine.
+
+🔗 https://github.com/bilalahmadsheikh/IlmSeUrooj
+
+#OpenSource #GitHub #WebDev #BuildInPublic
+
+────────────────────────────────────────────────────────────
+Words: 482 | Chars: 3575
+RAM: 7.9GB → 2.2GB (delta: -5.7GB)
+────────────────────────────────────────────────────────────

@@ -7,23 +7,43 @@ Fallback: Gemma 2 9B (reliable, well-tested)
 
 import sys
 import os
+import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from tools.model_runner import safe_run, get_free_ram
+from tools.model_runner import safe_run, get_free_ram, force_unload
 
 
-CONTENT_SYSTEM_PROMPT = """You are a content writer for a developer who shares project stories on LinkedIn. You blend human storytelling with technical depth.
+def _load_profile_for_prompt() -> dict:
+    """Load profile.yaml for dynamic prompt injection."""
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "profile.yaml")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    except Exception:
+        return {}
+
+
+def _build_system_prompt() -> str:
+    """Build system prompt with dynamic profile data from profile.yaml."""
+    p = _load_profile_for_prompt()
+    personal = p.get("personal", {})
+    name = personal.get("name", "the developer")
+    degree = personal.get("degree", "")
+    github = personal.get("github", "")
+    location = personal.get("location", "")
+    
+    return f"""You are a content writer for a developer who shares project stories on LinkedIn. You blend human storytelling with technical depth.
 
 About the developer:
-- Name: Bilal Ahmad Sheikh
-- AI Engineering student, 3rd year (6th semester), Pakistan
-- GitHub: github.com/bilalahmadsheikh
+- Name: {name}
+- {degree}{f', {location}' if location else ''}
+- GitHub: github.com/{github}
 
 Your writing style has TWO layers:
 
 1. HUMAN LAYER (the story):
 - Start with the real-world problem you OBSERVED — what frustrated you or someone around you?
-- Show the journey: "I noticed students around me were...", "Coming from Pakistan, I saw that..."
+- Show the journey: "I noticed students around me were...", "Coming from {location}, I saw that..."
 - Make the reader feel WHY this project matters, what gap it fills
 - Be personal, conversational, passionate — share the motivation
 
@@ -34,23 +54,17 @@ Your writing style has TWO layers:
 
 Combine both: Tell the story THEN show the craft.
 
-Example of GOOD:
-"Every year, thousands of Pakistani students apply to 5-10 universities — manually filling the same form over and over. I built IlmSeUrooj to fix this: a Next.js app with Supabase backend + Chrome Extension that autofills university portals. The swipe-based discovery UI lets students browse universities like Tinder — swipe right to save, left to skip."
-
-Example of BAD:
-"Excited to share my new project! It uses modern technologies to help students. Check it out!"
-
 Rules:
 - ONLY use facts from the provided GitHub data
 - NEVER invent metrics or user counts not in the data
 - Always include the GitHub repo link
-- Write in first person as Bilal"""
+- Write in first person as {name}"""
 
 
 def generate(prompt: str, content_type: str = "general") -> str:
     """
     Generate content using the best available model.
-    Primary: Qwen3 8B | Fallback: Gemma 2 9B | Last resort: Gemma3 1B
+    Primary: Gemma 3 4B | Fallback: Gemma 2 9B | Last resort: Gemma3 1B
     
     Args:
         prompt: Full generation prompt
@@ -60,19 +74,20 @@ def generate(prompt: str, content_type: str = "general") -> str:
         Generated content string
     """
     free = get_free_ram()
+    system_prompt = _build_system_prompt()
     
     # Try Gemma 3 4B first (best quality, same family as orchestrator)
     if free >= 3.0:
         # Unload orchestrator to free RAM for specialist
-        from tools.model_runner import force_unload
         force_unload("gemma3:1b")
         import time; time.sleep(1)
         free = get_free_ram()
         
         print(f"[CONTENT] Using Gemma 3 4B (primary) — {free:.1f}GB free")
-        result = safe_run("gemma3:4b", prompt, required_gb=3.0, system=CONTENT_SYSTEM_PROMPT)
+        result = safe_run("gemma3:4b", prompt, required_gb=3.0, system=system_prompt)
         
         if not result.startswith("[ERROR]") and len(result) > 100:
+            force_unload("gemma3:4b")  # Free RAM after generation
             return result
         
         # Log the error so user knows WHY it failed
@@ -82,31 +97,25 @@ def generate(prompt: str, content_type: str = "general") -> str:
         # Quality check failed — retry once
         if not result.startswith("[ERROR]") and len(result) < 150:
             print("[CONTENT] Output too short, retrying with Gemma 3 4B...")
-            result = safe_run("gemma3:4b", prompt + "\n\nIMPORTANT: Write a complete, detailed response of at least 250 words.", required_gb=3.0, system=CONTENT_SYSTEM_PROMPT)
+            result = safe_run("gemma3:4b", prompt + "\n\nIMPORTANT: Write a complete, detailed response of at least 250 words.", required_gb=3.0, system=system_prompt)
             if not result.startswith("[ERROR]"):
+                force_unload("gemma3:4b")
                 return result
     
     # Fallback: Gemma 2 9B
     free = get_free_ram()
     if free >= 6.0:
         print(f"[CONTENT] Using Gemma 2 9B (fallback) — {free:.1f}GB free")
-        result = safe_run("gemma2:9b", prompt, required_gb=6.0, system=CONTENT_SYSTEM_PROMPT)
+        result = safe_run("gemma2:9b", prompt, required_gb=6.0, system=system_prompt)
         if not result.startswith("[ERROR]"):
+            force_unload("gemma2:9b")
             return result
     
     # Last resort: Gemma3 1B
     free = get_free_ram()
     print(f"[CONTENT] Using Gemma3 1B (last resort) — {free:.1f}GB free")
-    result = safe_run("gemma3:1b", prompt, required_gb=0.5, system=CONTENT_SYSTEM_PROMPT)
+    result = safe_run("gemma3:1b", prompt, required_gb=0.5, system=system_prompt)
     return result
-
-
-def _strip_thinking(text: str) -> str:
-    """Strip Qwen3's <think>...</think> reasoning tags from output."""
-    import re
-    # Remove <think>...</think> blocks (Qwen3 hybrid thinking mode)
-    cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-    return cleaned.strip()
 
 
 if __name__ == "__main__":
