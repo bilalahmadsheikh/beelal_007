@@ -41,8 +41,8 @@ log = logging.getLogger("scheduler")
 # ─── Config ──────────────────────────────────────
 
 def _load_settings() -> dict:
-    """Load scheduler settings from profile.yaml."""
-    path = os.path.join(PROJECT_ROOT, "config", "profile.yaml")
+    """Load scheduler settings from settings.yaml."""
+    path = os.path.join(PROJECT_ROOT, "config", "settings.yaml")
     try:
         with open(path, "r", encoding="utf-8") as f:
             config = yaml.safe_load(f) or {}

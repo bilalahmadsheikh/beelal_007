@@ -89,7 +89,16 @@ CANDIDATE: {profile.get('degree', '')}
 
 Output JSON: {{"score": int, "matching_skills": list, "missing": list, "reason": str}}"""
     
-    raw = safe_run("gemma3:1b", prompt, required_gb=0.5, system=SCORING_SYSTEM_PROMPT)
+    # Load scoring model from settings
+    try:
+        import yaml as _yaml
+        settings_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "settings.yaml")
+        with open(settings_path, "r") as f:
+            scoring_model = (_yaml.safe_load(f) or {}).get("routing_model", "gemma3:1b")
+    except Exception:
+        scoring_model = "gemma3:1b"
+    
+    raw = safe_run(scoring_model, prompt, required_gb=0.5, system=SCORING_SYSTEM_PROMPT)
     
     if raw.startswith("[ERROR]"):
         return _fallback_score(job, profile)

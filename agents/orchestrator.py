@@ -7,9 +7,21 @@ Always-on, lightweight (~1GB RAM), JSON-only output.
 import json
 import sys
 import os
+import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tools.model_runner import safe_run, get_free_ram
+
+
+def _get_routing_model() -> str:
+    """Get routing model from settings.yaml."""
+    try:
+        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "settings.yaml")
+        with open(path, "r", encoding="utf-8") as f:
+            settings = yaml.safe_load(f) or {}
+        return settings.get("routing_model", "gemma3:1b")
+    except Exception:
+        return "gemma3:1b"
 
 
 ROUTER_SYSTEM_PROMPT = """You are a command router for a personal AI agent. Your ONLY job is to output valid JSON.
@@ -48,7 +60,7 @@ def route_command(user_input: str) -> dict:
     prompt = f"Classify this user command and output JSON:\n\n\"{user_input}\""
     
     raw = safe_run(
-        model="gemma3:1b",
+        model=_get_routing_model(),
         prompt=prompt,
         required_gb=0.5,
         system=ROUTER_SYSTEM_PROMPT

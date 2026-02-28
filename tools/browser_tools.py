@@ -15,8 +15,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(PROJECT_ROOT, "memory", "agent_memory.db")
-BRIDGE_URL = "http://localhost:8000"
 EXTENSION_PATH = os.path.join(PROJECT_ROOT, "chrome_extension")
+
+def _get_bridge_url() -> str:
+    """Get bridge URL from settings.yaml."""
+    try:
+        import yaml
+        with open(os.path.join(PROJECT_ROOT, "config", "settings.yaml"), "r") as f:
+            settings = yaml.safe_load(f) or {}
+        port = settings.get("bridge_port", 8000)
+        return f"http://localhost:{port}"
+    except Exception:
+        return "http://localhost:8000"
+
+BRIDGE_URL = _get_bridge_url()
 
 
 def _get_stored_cookies(site: str) -> list:

@@ -96,7 +96,7 @@ def generate_weekly_posts(mode: str = "local") -> list:
 Topic: {idea['hook']}
 
 About the author: {profile_name}, AI Engineering student (3rd year), builds real projects.
-Link back to a relevant project from github.com/bilalahmadsheikh if applicable.
+Link back to a relevant project from github.com/{profile.get('personal', {}).get('github', '')} if applicable.
 
 Write 300-500 words. Be personal, thoughtful, technical. First person.
 End with 4-6 hashtags. NO preamble — output ONLY the post."""
@@ -137,7 +137,7 @@ End with 4-6 hashtags. NO preamble — output ONLY the post."""
         
         # Log to content_log
         log_content(idea["type"], final, status="pending_approval", 
-                    platform="linkedin", model_used=f"gemma3:4b+{mode}")
+                    platform="linkedin", model_used=f"{mode}")
         
         # Log to Excel
         try:

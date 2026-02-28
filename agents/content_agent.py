@@ -13,6 +13,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tools.model_runner import safe_run, get_free_ram, force_unload
 
 
+def _load_settings() -> dict:
+    """Load settings.yaml for dynamic model config."""
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "settings.yaml")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    except Exception:
+        return {}
+
+
 def _load_profile_for_prompt() -> dict:
     """Load profile.yaml for dynamic prompt injection."""
     path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "profile.yaml")
@@ -76,45 +86,50 @@ def generate(prompt: str, content_type: str = "general") -> str:
     free = get_free_ram()
     system_prompt = _build_system_prompt()
     
-    # Try Gemma 3 4B first (best quality, same family as orchestrator)
+    settings = _load_settings()
+    primary_model = settings.get("content_model_primary", "gemma3:4b")
+    fallback_model = settings.get("content_model_fallback", "gemma2:9b")
+    router_model = settings.get("routing_model", "gemma3:1b")
+    
+    # Try primary model first (best quality)
     if free >= 3.0:
         # Unload orchestrator to free RAM for specialist
-        force_unload("gemma3:1b")
+        force_unload(router_model)
         import time; time.sleep(1)
         free = get_free_ram()
         
-        print(f"[CONTENT] Using Gemma 3 4B (primary) — {free:.1f}GB free")
-        result = safe_run("gemma3:4b", prompt, required_gb=3.0, system=system_prompt)
+        print(f"[CONTENT] Using {primary_model} (primary) — {free:.1f}GB free")
+        result = safe_run(primary_model, prompt, required_gb=3.0, system=system_prompt)
         
         if not result.startswith("[ERROR]") and len(result) > 100:
-            force_unload("gemma3:4b")  # Free RAM after generation
+            force_unload(primary_model)  # Free RAM after generation
             return result
         
         # Log the error so user knows WHY it failed
         if result.startswith("[ERROR]"):
-            print(f"[CONTENT] Gemma 3 4B failed: {result}")
+            print(f"[CONTENT] {primary_model} failed: {result}")
         
         # Quality check failed — retry once
         if not result.startswith("[ERROR]") and len(result) < 150:
-            print("[CONTENT] Output too short, retrying with Gemma 3 4B...")
-            result = safe_run("gemma3:4b", prompt + "\n\nIMPORTANT: Write a complete, detailed response of at least 250 words.", required_gb=3.0, system=system_prompt)
+            print(f"[CONTENT] Output too short, retrying with {primary_model}...")
+            result = safe_run(primary_model, prompt + "\n\nIMPORTANT: Write a complete, detailed response of at least 250 words.", required_gb=3.0, system=system_prompt)
             if not result.startswith("[ERROR]"):
-                force_unload("gemma3:4b")
+                force_unload(primary_model)
                 return result
     
-    # Fallback: Gemma 2 9B
+    # Fallback model
     free = get_free_ram()
     if free >= 6.0:
-        print(f"[CONTENT] Using Gemma 2 9B (fallback) — {free:.1f}GB free")
-        result = safe_run("gemma2:9b", prompt, required_gb=6.0, system=system_prompt)
+        print(f"[CONTENT] Using {fallback_model} (fallback) — {free:.1f}GB free")
+        result = safe_run(fallback_model, prompt, required_gb=6.0, system=system_prompt)
         if not result.startswith("[ERROR]"):
-            force_unload("gemma2:9b")
+            force_unload(fallback_model)
             return result
     
-    # Last resort: Gemma3 1B
+    # Last resort: router model
     free = get_free_ram()
-    print(f"[CONTENT] Using Gemma3 1B (last resort) — {free:.1f}GB free")
-    result = safe_run("gemma3:1b", prompt, required_gb=0.5, system=system_prompt)
+    print(f"[CONTENT] Using {router_model} (last resort) — {free:.1f}GB free")
+    result = safe_run(router_model, prompt, required_gb=0.5, system=system_prompt)
     return result
 
 
