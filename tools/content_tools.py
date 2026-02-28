@@ -450,11 +450,15 @@ CRITICAL RULES:
     
     # Ensure repo link is present (dynamic from profile)
     profile = _load_profile()
-    github_user = profile.get("personal", {}).get("github", "bilalahmadsheikh")
-    repo_name = _find_repo_name(project_name) or project_name
-    repo_url = f"https://github.com/{github_user}/{repo_name}"
-    if repo_url not in result and "github.com" not in result:
-        result += f"\n\n🔗 {repo_url}"
+    github_user = profile.get("personal", {}).get("github", "")
+    if not github_user:
+        # Skip repo link if GitHub username not in profile
+        pass
+    else:
+        repo_name = _find_repo_name(project_name) or project_name
+        repo_url = f"https://github.com/{github_user}/{repo_name}"
+        if repo_url not in result and "github.com" not in result:
+            result += f"\n\n🔗 {repo_url}"
     
     # Ensure hashtags are present
     if "#" not in result:

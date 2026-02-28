@@ -88,7 +88,7 @@ def _create_stealth_context(playwright, load_extension: bool = False, site: str 
         browser = playwright.chromium.launch(headless=True, args=launch_args)
     
     context = browser.new_context(
-        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
         viewport={"width": 1920, "height": 1080},
         locale="en-US",
     )
@@ -183,25 +183,30 @@ def post_to_linkedin(post_text: str) -> bool:
                 editor.fill(post_text)
                 print("[BROWSER] Post text filled")
             
-            # Wait for overlay approval
+            # Wait for overlay approval (or CLI fallback)
             if task_id:
                 print(f"[BROWSER] Waiting for overlay approval (task: {task_id})...")
                 result = _wait_for_approval(task_id, timeout=300)
+            else:
+                # Bridge offline — use CLI approval
+                from ui.approval_cli import show_approval
+                cli_result = show_approval("linkedin_post", post_text)
+                result = "approve" if cli_result is not None else "cancel"
                 
-                if result == "approve":
-                    # Click Post button
-                    post_btn = page.query_selector(
-                        'button.share-actions__primary-action, '
-                        'button[aria-label*="Post"]'
-                    )
-                    if post_btn:
-                        post_btn.click()
-                        time.sleep(3)
-                        print("[BROWSER] ✅ LinkedIn post submitted!")
-                        browser.close()
-                        return True
-                else:
-                    print(f"[BROWSER] Post cancelled: {result}")
+            if result == "approve":
+                # Click Post button
+                post_btn = page.query_selector(
+                    'button.share-actions__primary-action, '
+                    'button[aria-label*="Post"]'
+                )
+                if post_btn:
+                    post_btn.click()
+                    time.sleep(3)
+                    print("[BROWSER] ✅ LinkedIn post submitted!")
+                    browser.close()
+                    return True
+            else:
+                print(f"[BROWSER] Post cancelled: {result}")
             
             browser.close()
             return False
@@ -258,18 +263,23 @@ def fill_fiverr_gig(gig_data: dict) -> bool:
             
             print("[BROWSER] Fiverr gig form filled")
             
-            # Wait for overlay approval
+            # Wait for overlay approval (or CLI fallback)
             if task_id:
                 print(f"[BROWSER] Waiting for overlay approval (task: {task_id})...")
                 result = _wait_for_approval(task_id, timeout=300)
+            else:
+                # Bridge offline — use CLI approval  
+                from ui.approval_cli import show_approval
+                cli_result = show_approval("fiverr_gig", json.dumps(gig_data, indent=2))
+                result = "approve" if cli_result is not None else "cancel"
                 
-                if result == "approve":
-                    print("[BROWSER] ✅ Gig form approved — ready for manual review")
-                    time.sleep(5)  # Give user time to review
-                    browser.close()
-                    return True
-                else:
-                    print(f"[BROWSER] Gig cancelled: {result}")
+            if result == "approve":
+                print("[BROWSER] ✅ Gig form approved — ready for manual review")
+                time.sleep(5)
+                browser.close()
+                return True
+            else:
+                print(f"[BROWSER] Gig cancelled: {result}")
             
             browser.close()
             return False

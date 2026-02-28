@@ -72,14 +72,9 @@ def run_job_search(query: str, location: str = "remote", num: int = 20, min_scor
     top = get_top_jobs(all_jobs, min_score=min_score)
     
     if not top:
-        # Show top 5 regardless of score
+        # No jobs above min_score — get ALL scored results and show top 5 regardless
         print(f"[JOBS] No jobs scored above {min_score}. Showing top 5 by score...")
-        all_scored = []
-        for job in all_jobs[:10]:
-            s = score_job(job)
-            all_scored.append((job, s))
-        all_scored.sort(key=lambda x: x[1]["score"], reverse=True)
-        top = all_scored[:5]
+        top = get_top_jobs(all_jobs, min_score=0)[:5]
     
     # Step 4: Display results
     result_lines = []

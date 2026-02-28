@@ -13,26 +13,23 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tools.model_runner import safe_run, get_free_ram
 
 
-def _load_profile_skills() -> list:
-    """Load skills from profile.yaml."""
-    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "profile.yaml")
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            profile = yaml.safe_load(f) or {}
-        return profile.get("personal", {}).get("skills", [])
-    except Exception:
-        return []
+# In-memory cache so we don't read profile.yaml on every score_job() call
+_profile_cache = None
 
 
 def _load_profile_info() -> dict:
-    """Load key profile info for scoring context."""
+    """Load key profile info for scoring context, cached in memory."""
+    global _profile_cache
+    if _profile_cache is not None:
+        return _profile_cache
+    
     path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "profile.yaml")
     try:
         with open(path, "r", encoding="utf-8") as f:
             profile = yaml.safe_load(f) or {}
         personal = profile.get("personal", {})
         projects = profile.get("projects", [])
-        return {
+        _profile_cache = {
             "name": personal.get("name", ""),
             "degree": personal.get("degree", ""),
             "skills": personal.get("skills", []),
@@ -43,7 +40,8 @@ def _load_profile_info() -> dict:
             )),
         }
     except Exception:
-        return {"skills": [], "project_names": [], "project_techs": []}
+        _profile_cache = {"skills": [], "project_names": [], "project_techs": []}
+    return _profile_cache
 
 
 SCORING_SYSTEM_PROMPT = """You are a job-match scoring engine. Given a job posting and a candidate's profile, output ONLY a JSON object with these exact keys:

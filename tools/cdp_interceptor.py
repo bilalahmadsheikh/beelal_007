@@ -13,6 +13,39 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+def _load_stored_cookies(context, site: str):
+    """Load cookies from SQLite (synced by Chrome Extension) into Playwright context."""
+    import sqlite3
+    db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "memory", "agent_memory.db")
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT cookie_data FROM cookies WHERE site = ?", (site,)).fetchone()
+        conn.close()
+        if row:
+            cookies = json.loads(row["cookie_data"])
+            pw_cookies = []
+            for c in cookies:
+                pw_cookie = {
+                    "name": c.get("name", ""),
+                    "value": c.get("value", ""),
+                    "domain": c.get("domain", ""),
+                    "path": c.get("path", "/"),
+                }
+                if c.get("expirationDate"):
+                    pw_cookie["expires"] = c["expirationDate"]
+                if c.get("secure"):
+                    pw_cookie["secure"] = True
+                if c.get("httpOnly"):
+                    pw_cookie["httpOnly"] = True
+                pw_cookies.append(pw_cookie)
+            if pw_cookies:
+                context.add_cookies(pw_cookies)
+                print(f"[CDP] Loaded {len(pw_cookies)} stored cookies for {site}")
+    except Exception as e:
+        print(f"[CDP] No stored cookies for {site}: {e}")
+
+
 def intercept_linkedin_jobs(search_query: str, max_jobs: int = 20) -> list:
     """
     Use CDP to intercept LinkedIn's internal Voyager API for rich job data.
@@ -46,13 +79,16 @@ def intercept_linkedin_jobs(search_query: str, max_jobs: int = 20) -> list:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             context = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
                 viewport={"width": 1920, "height": 1080},
                 locale="en-US",
             )
             
             page = context.new_page()
             stealth.apply_stealth(page)
+            
+            # Load stored LinkedIn cookies from SQLite (synced by Chrome Extension)
+            _load_stored_cookies(context, "linkedin.com")
             
             # Intercept network responses
             def handle_response(response):
