@@ -1,0 +1,34 @@
+intelligence_mode: local
+content_model_primary: gemma3:4b
+content_model_fallback: gemma2:9b
+routing_model: gemma3:1b
+enable_job_search: true
+enable_linkedin: true
+enable_fiverr: true
+enable_upwork: true
+enable_voice: false
+enable_hotkey: true
+hotkey: ctrl+shift+b
+job_keywords:
+- AI engineer
+- data scientist
+- MLOps
+- Python developer
+- AI intern
+job_min_score: 65
+job_locations:
+- remote
+- Pakistan
+- UAE
+post_days:
+- Monday
+- Wednesday
+- Friday
+post_time: 09:00
+github_check_hours: 24
+bridge_port: 8000
+scheduler:
+  mode: local
+  post_day: monday
+  post_time: 09:00
+  check_interval_hours: 1
