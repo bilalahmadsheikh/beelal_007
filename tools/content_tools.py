@@ -362,7 +362,7 @@ def _find_relevant_repos(job_title: str, service_type: str = "") -> list:
 # LinkedIn Post Generator
 # ─────────────────────────────────────────────────────
 
-def generate_linkedin_post(project_name: str, post_type: str = "project_showcase") -> str:
+def generate_linkedin_post(project_name: str, post_type: str = "project_showcase", user_request: str = "") -> str:
     """
     Generate a LinkedIn post about a project using DEEP GitHub data
     (README + docs/ + CHANGELOG + commits).
@@ -370,10 +370,10 @@ def generate_linkedin_post(project_name: str, post_type: str = "project_showcase
     Args:
         project_name: Name of the project to write about
         post_type: One of 'project_showcase', 'learning_update', 'achievement', 'opinion'
+        user_request: The user's original request text — included in prompt for custom instructions
         
     Returns:
-        LinkedIn post text (max 1300 chars, with hashtags)
-    """
+        LinkedIn post text (with hashtags)"""
     # Fetch DEEP repo data (README + docs/ + commits + metadata)
     repo_ctx = _get_deep_repo_context(project_name)
     
@@ -392,6 +392,9 @@ def generate_linkedin_post(project_name: str, post_type: str = "project_showcase
 
 Post type: {post_type}
 {instruction}
+
+USER'S REQUEST: "{user_request}"
+Honor the user's request above — if they asked to focus on specific features, architecture, or aspects, prioritize those in your post.
 
 WRITE THE POST WITH THIS FLOW:
 
@@ -495,7 +498,7 @@ def _clean_post(text: str, project_name: str) -> str:
 # Cover Letter Generator
 # ─────────────────────────────────────────────────────
 
-def generate_cover_letter(job_title: str, company: str, job_description: str = "") -> str:
+def generate_cover_letter(job_title: str, company: str, job_description: str = "", user_request: str = "") -> str:
     """
     Generate a targeted cover letter using REAL GitHub project data.
     Automatically finds the most relevant repos for the job.
@@ -543,6 +546,9 @@ CRITICAL RULES:
 - NO generic phrases like "I am writing to express my interest"
 - Write as Bilal Ahmad Sheikh, AI Engineering student (3rd year, 6th semester)
 - Sign off: "Best regards, Bilal Ahmad Sheikh"
+
+USER'S REQUEST: "{user_request}"
+Honor the user's specific instructions above if any.
 """
 
     return generate(prompt, content_type="cover_letter")
@@ -552,7 +558,7 @@ CRITICAL RULES:
 # Gig Description Generator
 # ─────────────────────────────────────────────────────
 
-def generate_gig_description(service_type: str, platform: str = "fiverr") -> dict:
+def generate_gig_description(service_type: str, platform: str = "fiverr", user_request: str = "") -> dict:
     """
     Generate a freelance gig description using REAL GitHub project data.
     Automatically finds relevant repos as portfolio evidence.
@@ -615,7 +621,11 @@ CRITICAL RULES:
 - ONLY reference tech stacks, features, and capabilities demonstrated in the repos above
 - NEVER invent metrics or portfolio items not in the data
 - Price based on actual demonstrated skill level
-- Output ONLY the JSON. No explanation, no markdown fences."""
+-CRITICAL: Output ONLY valid JSON. No explanation, no markdown — just the JSON object.
+
+USER'S REQUEST: "{user_request}"
+Honor the user's specific instructions above if any.
+"""
 
     raw = generate(prompt, content_type="gig_description")
     return _parse_gig_json(raw, service_type, platform)

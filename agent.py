@@ -210,19 +210,19 @@ def _handle_content(user_input: str, task: str) -> str | dict:
     
     if parsed and parsed["content_type"] == "linkedin_post":
         print(f"  → LinkedIn post about: {parsed['project_name']}")
-        result = generate_linkedin_post(parsed["project_name"], parsed.get("post_type", "project_showcase"))
+        result = generate_linkedin_post(parsed["project_name"], parsed.get("post_type", "project_showcase"), user_request=user_input)
         log_content("linkedin_post", result, "generated", "linkedin")
         return result
     
     elif parsed and parsed["content_type"] == "cover_letter":
         print(f"  → Cover letter for: {parsed['job_title']} at {parsed['company']}")
-        result = generate_cover_letter(parsed["job_title"], parsed["company"])
+        result = generate_cover_letter(parsed["job_title"], parsed["company"], user_request=user_input)
         log_content("cover_letter", result, "generated")
         return result
     
     elif parsed and parsed["content_type"] == "gig_description":
         print(f"  → Gig description for: {parsed['service_type']} on {parsed['platform']}")
-        result = generate_gig_description(parsed["service_type"], parsed["platform"])
+        result = generate_gig_description(parsed["service_type"], parsed["platform"], user_request=user_input)
         log_content("gig_description", json.dumps(result), "generated", parsed["platform"])
         return result
     
