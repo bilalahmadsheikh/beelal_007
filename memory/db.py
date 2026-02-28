@@ -71,6 +71,31 @@ def init_db():
         )
     """)
     
+    # Phase 4: Cookie storage for Playwright session reuse
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS cookies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            site TEXT NOT NULL,
+            cookie_data TEXT NOT NULL,
+            updated_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    
+    # Phase 4: Pending tasks for bridge ↔ extension communication
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pending_tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id TEXT UNIQUE NOT NULL,
+            task_type TEXT NOT NULL,
+            content_preview TEXT DEFAULT '',
+            action_label TEXT DEFAULT 'Approve',
+            status TEXT DEFAULT 'pending',
+            result TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    
     conn.commit()
     conn.close()
     print("[DB] Database initialized at", DB_PATH)
