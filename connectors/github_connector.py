@@ -195,6 +195,157 @@ class GitHubConnector:
         self._set_cached(cache_key, all_commits)
         return all_commits
     
+    def get_repo_tree(self, repo: str) -> list:
+        """
+        Get the file/directory tree for a repo (top-level + docs/).
+        
+        Returns:
+            List of file paths found in the repo
+        """
+        cache_key = f"tree_{GITHUB_USERNAME}_{repo}"
+        cached = self._get_cached(cache_key)
+        if cached is not None:
+            return cached
+        
+        print(f"[GITHUB] Fetching file tree for {repo}...")
+        raw = self._api_get(f"/repos/{GITHUB_USERNAME}/{repo}/git/trees/main", {"recursive": "1"})
+        
+        # Try 'master' branch if 'main' fails
+        if raw is None:
+            raw = self._api_get(f"/repos/{GITHUB_USERNAME}/{repo}/git/trees/master", {"recursive": "1"})
+        
+        if raw is None:
+            return []
+        
+        tree = raw.get("tree", [])
+        paths = [item["path"] for item in tree if item.get("type") in ("blob", "tree")]
+        
+        self._set_cached(cache_key, paths)
+        return paths
+    
+    def get_file_content(self, repo: str, path: str) -> str:
+        """
+        Fetch the raw content of any file from a repo.
+        
+        Args:
+            repo: Repository name
+            path: File path within the repo (e.g. 'docs/FEATURES.md')
+            
+        Returns:
+            File content as string, or empty string on failure
+        """
+        cache_key = f"file_{GITHUB_USERNAME}_{repo}_{path.replace('/', '_')}"
+        cached = self._get_cached(cache_key)
+        if cached is not None:
+            return cached
+        
+        print(f"[GITHUB] Fetching {repo}/{path}...")
+        url = f"{self.base_url}/repos/{GITHUB_USERNAME}/{repo}/contents/{path}"
+        try:
+            resp = requests.get(url, headers={
+                **self.headers,
+                "Accept": "application/vnd.github.v3.raw"
+            }, timeout=30)
+            resp.raise_for_status()
+            content = resp.text
+            self._set_cached(cache_key, content)
+            return content
+        except requests.exceptions.RequestException:
+            return ""
+    
+    def get_deep_repo_context(self, repo: str) -> str:
+        """
+        Build a comprehensive context from a repo:
+        README + docs/ folder files + CHANGELOG + FEATURES + package.json.
+        
+        This is the PRIMARY source for content generation about a specific project.
+        
+        Args:
+            repo: Repository name
+            
+        Returns:
+            Rich multi-section text with all available project info
+        """
+        lines = [f"=== PROJECT: {repo} ==="]
+        
+        # 1. Repo metadata
+        repos = self.get_repos()
+        for r in repos:
+            if r["name"] == repo:
+                lines.append(f"Language: {r['language'] or 'Not detected'}")
+                lines.append(f"Description: {r['description'] or 'No description'}")
+                lines.append(f"URL: {r['url']}")
+                lines.append(f"Last updated: {r['updated_at'][:10]}")
+                break
+        
+        # 2. README
+        readme = self.get_readme(repo)
+        if readme:
+            readme_text = readme[:3000] if len(readme) > 3000 else readme
+            lines.append(f"\n=== README.md ===\n{readme_text}")
+        
+        # 3. Scan file tree for docs and important files
+        tree = self.get_repo_tree(repo)
+        
+        # Important files to look for (case-insensitive matching)
+        important_files = []
+        docs_files = []
+        
+        for path in tree:
+            lower = path.lower()
+            # Top-level important files
+            if lower in ("changelog.md", "features.md", "contributing.md", "architecture.md"):
+                important_files.append(path)
+            elif lower == "package.json":
+                important_files.append(path)
+            # Docs folder files
+            elif lower.startswith("docs/") and lower.endswith(".md"):
+                docs_files.append(path)
+            elif lower.startswith("doc/") and lower.endswith(".md"):
+                docs_files.append(path)
+        
+        # 4. Fetch important top-level files
+        for fpath in important_files:
+            content = self.get_file_content(repo, fpath)
+            if content:
+                content_text = content[:2000] if len(content) > 2000 else content
+                lines.append(f"\n=== {fpath} ===\n{content_text}")
+        
+        # 5. Fetch docs/ folder files (up to 5 most relevant)
+        if docs_files:
+            # Prioritize: FEATURES, CHANGELOG, ARCHITECTURE, SCHEMA, PROGRESS, then others
+            priority = ["feature", "changelog", "architecture", "schema", "progress", "api", "setup", "decision"]
+            sorted_docs = sorted(docs_files, key=lambda p: next(
+                (i for i, kw in enumerate(priority) if kw in p.lower()), len(priority)
+            ))
+            
+            fetched = 0
+            for fpath in sorted_docs:
+                if fetched >= 5:
+                    break
+                content = self.get_file_content(repo, fpath)
+                if content:
+                    content_text = content[:2000] if len(content) > 2000 else content
+                    lines.append(f"\n=== {fpath} ===\n{content_text}")
+                    fetched += 1
+            
+            # List remaining docs we didn't fetch
+            remaining = sorted_docs[fetched:]
+            if remaining:
+                lines.append(f"\n=== Other docs available (not fetched) ===")
+                for p in remaining[:10]:
+                    lines.append(f"  - {p}")
+        
+        # 6. Recent commits for this repo
+        commits = self.get_recent_commits(days=60)
+        repo_commits = [c for c in commits if c["repo"] == repo]
+        if repo_commits:
+            lines.append(f"\n=== RECENT COMMITS ({len(repo_commits)}) ===")
+            for c in repo_commits[:10]:
+                lines.append(f"  - {c['message'][:120]} ({c['date'][:10]})")
+        
+        return "\n".join(lines)
+    
     def get_summary(self) -> str:
         """Get a comprehensive human-readable summary of all GitHub data."""
         repos = self.get_repos()

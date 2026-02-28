@@ -1,0 +1,75 @@
+﻿============================================================
+  BilalAgent v2.0 — Starting Up
+============================================================
+
+[1/4] System RAM: 9.7GB free
+
+[2/4] Initializing database...
+[DB] Database initialized at D:\beelal_007\memory\agent_memory.db
+
+[3/4] Loading profile...
+       Profile: Bilal Ahmad Sheikh (4 projects)
+
+[4/4] Syncing GitHub...
+[GITHUB] Using cached repos (20 repos)
+       Found 20 repos
+
+============================================================
+  Agent Ready
+============================================================
+
+────────────────────────────────────────────────────────────
+Command: "write a linkedin post about IlmSeUrooj"
+────────────────────────────────────────────────────────────
+
+[STEP 1] Routing via Orchestrator (gemma3:1b)...
+  [TIMING] gemma3:1b: TTFT=2.6s | 42 tokens | 16.1 tok/s | keep_alive=5m
+         Routing: {
+  "agent": "content",
+  "task": "write_cover_letter",
+  "model": "qwen3:8b"
+}
+
+[STEP 2] Executing via content agent (model: qwen3:8b)...
+  → LinkedIn post about: ilmseurooj
+[GITHUB] Using cached repos (20 repos)
+  [CONTENT] Matched repo: IlmSeUrooj
+  [CONTENT] Fetching deep context (README + docs/ + commits)...
+[GITHUB] Using cached repos (20 repos)
+[GITHUB] Fetching file tree for IlmSeUrooj...
+[GITHUB] Fetching IlmSeUrooj/package.json...
+[GITHUB] Fetching IlmSeUrooj/docs/FEATURES.md...
+[GITHUB] Fetching IlmSeUrooj/docs/CHANGELOG.md...
+[GITHUB] Fetching IlmSeUrooj/docs/architecture.md...
+[GITHUB] Fetching IlmSeUrooj/docs/agent/SCHEMA.md...
+[GITHUB] Fetching IlmSeUrooj/docs/agent/PROGRESS.md...
+[GITHUB] Using cached commits (30 commits)
+[CONTENT] Using Qwen3 8B (primary) — 8.4GB free
+[CONTENT] Using Gemma3 1B (last resort) — 0.4GB free
+  [RAM] 0.4GB free, need 0.5GB — unloading specialists...
+  [UNLOAD] qwen3:8b freed from RAM
+  [UNLOAD] gemma2:9b freed from RAM
+  [UNLOAD] phi4-mini freed from RAM
+  [TIMING] gemma3:1b: TTFT=35.1s | 371 tokens | 29.6 tok/s | keep_alive=5m
+
+────────────────────────────────────────────────────────────
+RESULT:
+────────────────────────────────────────────────────────────
+Okay, here’s a LinkedIn post draft, aiming for that Bilal Ahmad Sheikh vibe – conversational, specific, authentic, and focused on the project’s value.
+
+---
+
+“Hey everyone! 👋 Let’s talk about IlmSeUrooj – a project I’m super passionate about! We’re building a unique profile system for Pakistani students applying to universities across Pakistan, all in one place. 🤩
+
+Essentially, we’ve created a Swipe-based discovery engine that lets students easily explore universities based on their interests – from fields like Science, Arts, and more. Each university gets a customized profile, allowing students to quickly see what's available. ➡️ Swipe right to save, left to skip – it’s designed for super intuitive browsing.
+
+The backend is built with JavaScript & Next.js, using Supabase for the database, which handles the data. We've included features like smart filter system that considers everything – grade levels, program types, and even hostel availability. 🧐 It's all powered by a Merit calculation. 🎯
+
+I’m really proud of how the project’s going – the 17 universities are almost fully functional! 💪 It’s a big step towards making it easier for students to find their dream schools. 🚀
+
+Check out the GitHub repo ([https://github.com/bilalahmadsheikh/IlmSeUrooj](https://github.
+
+────────────────────────────────────────────────────────────
+Words: 194 | Chars: 1280
+RAM: 9.7GB → 8.4GB (delta: -1.3GB)
+────────────────────────────────────────────────────────────

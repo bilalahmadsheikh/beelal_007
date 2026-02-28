@@ -1,7 +1,7 @@
 """
 content_tools.py — BilalAgent v2.0 Content Generation Tools
 LinkedIn posts, cover letters, and gig descriptions.
-All generation goes through agents/content_agent.py → safe_run() → keep_alive:0.
+All content is grounded in REAL GitHub data (README, docs/, commits).
 """
 
 import sys
@@ -26,7 +26,7 @@ def _load_profile() -> dict:
 
 
 def _get_github_context() -> str:
-    """Get real GitHub data for grounding content."""
+    """Get general GitHub summary for broad context."""
     try:
         gh = GitHubConnector()
         return gh.get_summary()
@@ -57,52 +57,71 @@ def _find_repo_name(project_name: str) -> str | None:
         return None
 
 
-def _get_repo_context(project_name: str) -> str:
+def _get_deep_repo_context(project_name: str) -> str:
     """
-    Fetch the actual README, repo metadata, and recent commits for a specific project.
-    This is the PRIMARY data source for content generation.
+    Fetch DEEP context for a repo: README + docs/ folder + CHANGELOG + package.json + commits.
+    This is the PRIMARY data source for all content generation.
     """
     gh = GitHubConnector()
     
-    # Find the actual repo name (fuzzy match)
+    # Fuzzy match to actual repo name
     repo_name = _find_repo_name(project_name)
     if not repo_name:
         print(f"  [CONTENT] Repo '{project_name}' not found on GitHub, using general context")
         return _get_github_context()
     
     print(f"  [CONTENT] Matched repo: {repo_name}")
+    print(f"  [CONTENT] Fetching deep context (README + docs/ + commits)...")
     
-    lines = [f"=== PROJECT: {repo_name} ==="]
+    return gh.get_deep_repo_context(repo_name)
+
+
+def _get_multi_repo_context(repo_names: list) -> str:
+    """
+    Fetch deep context for MULTIPLE repos.
+    Used by cover letters and gig descriptions that reference several projects.
+    """
+    gh = GitHubConnector()
+    sections = []
     
-    # Repo metadata
+    for name in repo_names[:3]:  # Max 3 repos to keep prompt manageable
+        repo_name = _find_repo_name(name)
+        if repo_name:
+            print(f"  [CONTENT] Fetching deep context for: {repo_name}")
+            ctx = gh.get_deep_repo_context(repo_name)
+            sections.append(ctx)
+    
+    if not sections:
+        return _get_github_context()
+    
+    return "\n\n" + ("\n\n---\n\n".join(sections))
+
+
+def _find_relevant_repos(job_title: str, service_type: str = "") -> list:
+    """
+    Find repos most relevant to a job title or service type by matching
+    languages, descriptions, and repo names.
+    """
+    gh = GitHubConnector()
     repos = gh.get_repos()
+    
+    search_terms = (job_title + " " + service_type).lower().split()
+    
+    scored = []
     for r in repos:
-        if r["name"] == repo_name:
-            lines.append(f"Language: {r['language'] or 'Not detected'}")
-            lines.append(f"Description: {r['description'] or 'No description'}")
-            lines.append(f"URL: {r['url']}")
-            lines.append(f"Last updated: {r['updated_at'][:10]}")
-            break
+        score = 0
+        text = f"{r['name']} {r['description']} {r['language']}".lower()
+        for term in search_terms:
+            if term in text:
+                score += 1
+        if r['language']:
+            score += 0.5  # Bonus for having a detected language
+        if r['description']:
+            score += 0.5  # Bonus for having a description
+        scored.append((r['name'], score))
     
-    # README content (the real gold)
-    readme = gh.get_readme(repo_name)
-    if readme:
-        # Truncate README to ~2000 chars to fit in prompt
-        if len(readme) > 2000:
-            readme = readme[:2000] + "\n... [README truncated]"
-        lines.append(f"\n=== README.md ===\n{readme}")
-    else:
-        lines.append("\n[No README found]")
-    
-    # Recent commits for this repo
-    commits = gh.get_recent_commits(days=60)
-    repo_commits = [c for c in commits if c["repo"] == repo_name]
-    if repo_commits:
-        lines.append(f"\n=== RECENT COMMITS ({len(repo_commits)}) ===")
-        for c in repo_commits[:10]:
-            lines.append(f"  - {c['message'][:100]} ({c['date'][:10]})")
-    
-    return "\n".join(lines)
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return [name for name, _ in scored[:3] if _ > 0]
 
 
 # ─────────────────────────────────────────────────────
@@ -111,7 +130,8 @@ def _get_repo_context(project_name: str) -> str:
 
 def generate_linkedin_post(project_name: str, post_type: str = "project_showcase") -> str:
     """
-    Generate a LinkedIn post about a project using its ACTUAL GitHub data.
+    Generate a LinkedIn post about a project using DEEP GitHub data
+    (README + docs/ + CHANGELOG + commits).
     
     Args:
         project_name: Name of the project to write about
@@ -120,19 +140,19 @@ def generate_linkedin_post(project_name: str, post_type: str = "project_showcase
     Returns:
         LinkedIn post text (max 1300 chars, with hashtags)
     """
-    # Fetch REAL repo data (README, commits, metadata)
-    repo_ctx = _get_repo_context(project_name)
+    # Fetch DEEP repo data (README + docs/ + commits + metadata)
+    repo_ctx = _get_deep_repo_context(project_name)
     
     type_instructions = {
-        "project_showcase": "Write a project showcase post. Lead with the problem solved, show the technical approach, highlight results from the README.",
-        "learning_update": "Write a learning journey post. Share what you learned building this, what surprised you, what you'd do differently.",
-        "achievement": "Write an achievement announcement. Celebrate a milestone, share the journey and specific features built.",
-        "opinion": "Write a thought-leadership opinion post. Take a stance on a technical topic related to this project.",
+        "project_showcase": "Write a project showcase post. Lead with the problem this project solves, show the technical approach from the README, highlight actual results and features documented in the repo.",
+        "learning_update": "Write a learning journey post. Based on the commits and docs, share what was learned building this, specific challenges, what the project does.",
+        "achievement": "Write an achievement announcement. Use specific features from the README and docs to celebrate what was built.",
+        "opinion": "Write a thought-leadership opinion post. Take a stance on a technical topic related to this project's domain.",
     }
     
     instruction = type_instructions.get(post_type, type_instructions["project_showcase"])
     
-    prompt = f"""Write a LinkedIn post about this project:
+    prompt = f"""Write a LinkedIn post about this project. Here is ALL the real data:
 
 {repo_ctx}
 
@@ -140,15 +160,17 @@ Post type: {post_type}
 {instruction}
 
 CRITICAL RULES:
-- ONLY mention features, metrics, and tech stacks that appear in the README and commits above
-- Do NOT mix in other projects or make up metrics
+- ONLY mention features, metrics, tech stacks, and details that appear in the data above
+- NEVER invent statistics, user counts, or performance numbers not in the data
+- If the README lists specific features, mention THOSE exact features
+- If docs show architecture or decisions, reference them specifically
 - Strong opening hook (NO generic "Excited to share...")
 - Sound like a real developer sharing their work, NOT AI-generated
 - Use line breaks between sections for readability
 - End with 3-5 relevant hashtags
 - MAXIMUM 1300 characters total
 - Write in first person as Bilal Ahmad Sheikh
-- Be conversational and authentic"""
+- Be conversational, specific, and authentic"""
 
     result = generate(prompt, content_type="linkedin_post")
     
@@ -168,7 +190,8 @@ CRITICAL RULES:
 
 def generate_cover_letter(job_title: str, company: str, job_description: str = "") -> str:
     """
-    Generate a targeted cover letter.
+    Generate a targeted cover letter using REAL GitHub project data.
+    Automatically finds the most relevant repos for the job.
     
     Args:
         job_title: Position title
@@ -178,7 +201,14 @@ def generate_cover_letter(job_title: str, company: str, job_description: str = "
     Returns:
         Cover letter (250-350 words)
     """
-    github_ctx = _get_github_context()
+    # Find which repos are most relevant to this job
+    relevant_repos = _find_relevant_repos(job_title)
+    
+    if relevant_repos:
+        print(f"  [CONTENT] Most relevant repos for '{job_title}': {relevant_repos}")
+        project_ctx = _get_multi_repo_context(relevant_repos)
+    else:
+        project_ctx = _get_github_context()
     
     prompt = f"""Write a cover letter for this position:
 
@@ -186,20 +216,24 @@ Job Title: {job_title}
 Company: {company}
 {f"Job Description: {job_description}" if job_description else ""}
 
-My real GitHub activity and projects:
-{github_ctx}
+My REAL project data (from GitHub repos — README, docs, commits):
+{project_ctx}
+
+General GitHub profile:
+{_get_github_context()}
 
 Structure (3 paragraphs ONLY):
-1. Opening: Why THIS role at THIS company specifically excites me. Be specific about the company, not generic.
-2. Evidence: My single most relevant project with concrete metrics. Pick the one that best matches this job. Reference real repo names and tech stacks from my GitHub data.
+1. Opening: Why THIS role at THIS company specifically excites me. Be specific about the company.
+2. Evidence: My most relevant project(s) with REAL details from the README/docs above. Reference actual features, architecture, and tech stacks. Do NOT invent metrics.
 3. Closing: Enthusiastic next step, mention availability for interview.
 
-Requirements:
-- 250-350 words STRICTLY (not shorter, not longer)
+CRITICAL RULES:
+- ONLY reference project details that appear in the README/docs data above
+- NEVER invent performance numbers, user counts, or metrics not in the data
+- Reference actual repo names, actual tech stacks, actual features from the docs
+- 250-350 words STRICTLY
 - Sound professional but warm, like a real human wrote it
-- Reference specific technologies from the job description
-- Include at least 2 concrete metrics from my projects
-- NO generic phrases like "I am writing to express my interest" or "I believe I would be a great fit"
+- NO generic phrases like "I am writing to express my interest"
 - Write as Bilal Ahmad Sheikh, AI Engineering student (3rd year, 6th semester)
 - Sign off: "Best regards, Bilal Ahmad Sheikh"
 """
@@ -213,7 +247,8 @@ Requirements:
 
 def generate_gig_description(service_type: str, platform: str = "fiverr") -> dict:
     """
-    Generate a freelance gig description with pricing tiers.
+    Generate a freelance gig description using REAL GitHub project data.
+    Automatically finds relevant repos as portfolio evidence.
     
     Args:
         service_type: One of 'mlops', 'chatbot', 'blockchain', 'data_science', 'backend'
@@ -222,29 +257,27 @@ def generate_gig_description(service_type: str, platform: str = "fiverr") -> dic
     Returns:
         dict with keys: title, description, tags, packages (basic/standard/premium)
     """
-    github_ctx = _get_github_context()
+    # Find repos relevant to this service type
+    relevant_repos = _find_relevant_repos(service_type)
     
-    service_context = {
-        "mlops": "MLOps pipelines, model deployment, automated retraining. Reference: 87% accuracy prediction system with XGBoost + MLflow + Docker.",
-        "chatbot": "AI chatbot development with FastAPI + Supabase. Reference: WhatsApp bot serving 90k customers for Pakistani SMEs.",
-        "blockchain": "Blockchain SDKs and Web3 development. Reference: basepy-sdk with 40% performance improvement over Web3.py on Base L2.",
-        "data_science": "Data science, ML models, analytics dashboards. Reference: Purchasing power prediction (87%), Route optimization with Kepler.",
-        "backend": "Backend development with FastAPI, PostgreSQL, Docker. Reference: Production-grade APIs and microservices.",
-    }
-    
-    context = service_context.get(service_type, service_context["backend"])
+    if relevant_repos:
+        print(f"  [CONTENT] Portfolio repos for '{service_type}': {relevant_repos}")
+        project_ctx = _get_multi_repo_context(relevant_repos)
+    else:
+        project_ctx = _get_github_context()
     
     prompt = f"""Create a {platform} gig listing for: {service_type}
 
-Service context: {context}
+My REAL portfolio projects (from GitHub — README, docs, commits):
+{project_ctx}
 
-My real projects (from GitHub):
-{github_ctx}
+General GitHub profile:
+{_get_github_context()}
 
 Return a JSON object with EXACTLY this structure:
 {{
     "title": "catchy gig title (max 80 chars)",
-    "description": "detailed gig description (200-300 words). Reference real metrics. Explain what the client gets. Sound professional.",
+    "description": "detailed gig description (200-300 words). Reference REAL features and tech stacks from the repos above. Explain what the client gets. Sound professional.",
     "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
     "packages": {{
         "basic": {{
@@ -271,11 +304,13 @@ Return a JSON object with EXACTLY this structure:
     }}
 }}
 
-Output ONLY the JSON. No explanation, no markdown fences."""
+CRITICAL RULES:
+- ONLY reference tech stacks, features, and capabilities demonstrated in the repos above
+- NEVER invent metrics or portfolio items not in the data
+- Price based on actual demonstrated skill level
+- Output ONLY the JSON. No explanation, no markdown fences."""
 
     raw = generate(prompt, content_type="gig_description")
-    
-    # Parse JSON from response
     return _parse_gig_json(raw, service_type, platform)
 
 
@@ -305,7 +340,6 @@ def _parse_gig_json(raw: str, service_type: str, platform: str) -> dict:
     try:
         return json.loads(text)
     except (json.JSONDecodeError, TypeError):
-        # Return raw text as description if JSON parse fails
         return {
             "title": f"{service_type.replace('_', ' ').title()} Services on {platform.title()}",
             "description": raw,
@@ -326,6 +360,6 @@ if __name__ == "__main__":
     
     # Test LinkedIn post
     print("\n[TEST 1] LinkedIn Post:")
-    post = generate_linkedin_post("purchasing_power_ml", "project_showcase")
+    post = generate_linkedin_post("IlmSeUrooj", "project_showcase")
     print(post)
     print(f"\n({len(post)} chars)")
