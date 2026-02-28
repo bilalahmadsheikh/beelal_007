@@ -173,7 +173,10 @@ def handle_command(user_input: str, profile: dict):
         result = f"[MEMORY] Task '{task}' noted. Memory operations coming in future phases."
     
     elif agent_name == "navigation":
-        result = f"[NAVIGATION] Task '{task}' noted. Browser automation coming in Phase 3."
+        result = f"[NAVIGATION] Task '{task}' noted. Browser automation coming in Phase 4."
+    
+    elif agent_name == "jobs":
+        result = _handle_jobs(user_input, task)
     
     else:
         result = f"[UNKNOWN] Agent '{agent_name}' not recognized."
@@ -233,6 +236,59 @@ def _handle_content(user_input: str, task: str) -> str | dict:
     return result
 
 
+def _handle_jobs(user_input: str, task: str) -> str:
+    """Handle job search and application commands."""
+    from tools.apply_workflow import run_job_search, show_my_applications
+    
+    lower = user_input.lower()
+    
+    # Show applications
+    if any(kw in lower for kw in ["show my application", "my applications", "applied jobs", "application log"]):
+        status_filter = None
+        for s in ["saved", "applied", "rejected", "interview", "offer"]:
+            if s in lower:
+                status_filter = s
+                break
+        return show_my_applications(status_filter)
+    
+    # Parse job search: "find X jobs Y" or "search for X in Y"
+    query, location = _parse_job_query(user_input)
+    print(f"  → Job search: '{query}' in '{location}'")
+    
+    return run_job_search(query, location)
+
+
+def _parse_job_query(user_input: str) -> tuple:
+    """Parse a job search command into (query, location)."""
+    lower = user_input.lower()
+    
+    # Remove command prefixes
+    for prefix in ["find ", "search for ", "search ", "look for ", "get "]:
+        if lower.startswith(prefix):
+            lower = lower[len(prefix):]
+            break
+    
+    # Extract location
+    location = "remote"  # default
+    location_keywords = [
+        "in pakistan", "in usa", "in uk", "in europe", "in india",
+        "in lahore", "in karachi", "in islamabad",
+        "remote", "on-site", "hybrid",
+    ]
+    for loc in location_keywords:
+        if loc in lower:
+            location = loc.replace("in ", "").strip()
+            lower = lower.replace(loc, "").strip()
+            break
+    
+    # Clean up the query
+    for noise in ["jobs", "job", "internships", "internship", "positions", "openings"]:
+        lower = lower.replace(noise, "").strip()
+    
+    query = lower.strip() or "AI Engineer"
+    return query, location
+
+
 def main():
     """Main entry point."""
     profile = startup()
@@ -247,6 +303,9 @@ def main():
         print('  python agent.py "write a linkedin post about purchasing_power_ml"')
         print('  python agent.py "write a cover letter for Python developer at Google"')
         print('  python agent.py "fiverr gig for chatbot"')
+        print('  python agent.py "find AI jobs remote"')
+        print('  python agent.py "find Python internships Pakistan"')
+        print('  python agent.py "show my applications"')
 
 
 if __name__ == "__main__":

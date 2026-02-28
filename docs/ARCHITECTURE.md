@@ -30,25 +30,34 @@ BilalAgent is a personal AI desktop agent that runs 100% locally with no paid AP
 │            Gemma 3 1B (always warm, 5m)          │
 │   Input: raw command → Output: JSON routing      │
 │   {"agent", "task", "model"}                     │
-└───┬──────────┬──────────┬───────────┬───────────┘
-    │          │          │           │
-    ▼          ▼          ▼           ▼
-┌────────┐┌────────┐┌─────────┐┌──────────┐
-│  NLP   ││Content ││Navigate ││ Memory   │
-│ Agent  ││ Agent  ││ Agent   ││ Agent    │
-│gemma/  ││Gemma3 ││gemma3:1b││  SQLite  │
-│phi4    ││  4B   ││         ││          │
-└───┬────┘└───┬────┘└─────────┘└──────────┘
-    │         │
+└───┬──────────┬──────────┬───────────┬───────────┬───────────┘
+    │          │          │           │           │
+    ▼          ▼          ▼           ▼           ▼
+┌────────┐┌────────┐┌─────────┐┌──────────┐┌──────────┐
+│  NLP   ││Content ││Navigate ││ Memory   ││  Jobs    │
+│ Agent  ││ Agent  ││ Agent   ││ Agent    ││ Agent    │
+│gemma/  ││Gemma3 ││gemma3:1b││  SQLite  ││ JobSpy   │
+│phi4    ││  4B   ││         ││          ││ + CDP    │
+└───┬────┘└───┬────┘└─────────┘└──────────┘└────┬─────┘
+    │         │                                  │
     │         ├─ Unload orchestrator → Load gemma3:4b
     │         ├─ Generate with system prompt (from profile.yaml)
     │         ├─ Unload specialist → Return result
     │         └─ Fallback: gemma2:9b → gemma3:1b
+    │                                            │
+    │                                 ┌──────────▼──────────┐
+    │                                 │  Job Search Pipeline │
+    │                                 │ CDP → JobSpy → Score │
+    │                                 │ → Display → Excel    │
+    │                                 └─────────────────────┘
     ▼
 ┌────────────────────────────────────────┐
 │       Connectors & Memory              │
 │  GitHub REST API (24h cache)           │
+│  JobSpy multi-site scraper (12h cache) │
+│  CDP LinkedIn interceptor (stealth)    │
 │  SQLite (profiles, actions, memory)    │
+│  Excel logger (applied_jobs.xlsx)      │
 │  Profile YAML config                   │
 └────────────────────────────────────────┘
 ```

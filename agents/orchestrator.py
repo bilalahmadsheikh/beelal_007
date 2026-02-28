@@ -25,11 +25,12 @@ Rules:
 - Writing cover letters, posts, proposals → agent: "content", model: "gemma3:4b"
 - Browsing websites, scraping jobs → agent: "navigation", model: "gemma3:1b"
 - Storing/retrieving data, notes, memories → agent: "memory", model: "gemma3:1b"
+- Finding jobs, job search, show applications, job recommendations → agent: "jobs", model: "gemma3:1b"
 
 Output ONLY the JSON object. No explanation, no markdown, no extra text. Just the raw JSON."""
 
 
-SUPPORTED_AGENTS = {"nlp", "content", "navigation", "memory"}
+SUPPORTED_AGENTS = {"nlp", "content", "navigation", "memory", "jobs"}
 SUPPORTED_MODELS = {"gemma3:1b", "phi4-mini", "gemma3:4b", "gemma2:9b"}
 
 
