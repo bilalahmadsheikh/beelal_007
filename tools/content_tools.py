@@ -73,7 +73,161 @@ def _get_deep_repo_context(project_name: str) -> str:
     print(f"  [CONTENT] Matched repo: {repo_name}")
     print(f"  [CONTENT] Fetching deep context (README + docs/ + commits)...")
     
-    return gh.get_deep_repo_context(repo_name)
+    raw = gh.get_deep_repo_context(repo_name)
+    
+    # Compress into structured summary for the model
+    return _compress_context(raw)
+
+
+def _compress_context(raw_context: str) -> str:
+    """
+    Compress raw deep context into a structured, model-friendly summary.
+    Extracts key info: metadata, features list, tech stack, build phases, commits.
+    This avoids overwhelming small models with raw markdown.
+    """
+    lines = raw_context.split("\n")
+    
+    sections = {
+        "metadata": [],
+        "features": [],
+        "tech_stack": [],
+        "architecture": [],
+        "phases": [],
+        "commits": [],
+    }
+    
+    current_section = None
+    
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        
+        # Section detection
+        if stripped.startswith("=== PROJECT:"):
+            current_section = "metadata"
+            sections["metadata"].append(stripped)
+            continue
+        elif stripped.startswith("=== README"):
+            current_section = "features"
+            continue
+        elif stripped.startswith("=== package.json"):
+            current_section = "tech_stack"
+            continue
+        elif "architecture" in stripped.lower() and stripped.startswith("==="):
+            current_section = "architecture"
+            continue
+        elif "FEATURES" in stripped and stripped.startswith("==="):
+            current_section = "features"
+            continue
+        elif "PROGRESS" in stripped and stripped.startswith("==="):
+            current_section = "phases"
+            continue
+        elif "CHANGELOG" in stripped and stripped.startswith("==="):
+            current_section = "phases"
+            continue
+        elif "SCHEMA" in stripped and stripped.startswith("==="):
+            current_section = "architecture"
+            continue
+        elif "COMMITS" in stripped and stripped.startswith("==="):
+            current_section = "commits"
+            continue
+        elif stripped.startswith("=== "):
+            current_section = "features"  # default bucket
+            continue
+        
+        # Extract useful content
+        if current_section == "metadata":
+            if any(stripped.startswith(k) for k in ["Language:", "Description:", "URL:", "Last updated:"]):
+                sections["metadata"].append(stripped)
+        
+        elif current_section == "features":
+            # Extract feature names and descriptions
+            if stripped.startswith("- **") or stripped.startswith("**"):
+                sections["features"].append(stripped)
+            elif stripped.startswith("## ") and "feature" not in stripped.lower() and "what works" not in stripped.lower():
+                sections["features"].append(f"Feature: {stripped[3:]}")
+            elif "status" in stripped.lower() and "✅" in stripped:
+                continue  # skip status lines
+            elif stripped.startswith("- ") and len(stripped) > 15:
+                sections["features"].append(stripped)
+            elif stripped.startswith("### ") and len(stripped) > 5:
+                sections["features"].append(f"Section: {stripped[4:]}")
+        
+        elif current_section == "tech_stack":
+            if '"' in stripped and ':' in stripped:
+                sections["tech_stack"].append(stripped)
+        
+        elif current_section == "architecture":
+            if stripped.startswith("## ") or stripped.startswith("### "):
+                sections["architecture"].append(stripped.lstrip("#").strip())
+            elif "built with" in stripped.lower() or "next.js" in stripped.lower() or "supabase" in stripped.lower() or "app router" in stripped.lower():
+                sections["architecture"].append(stripped)
+            elif any(kw in stripped.lower() for kw in ["rls", "component", "78 column", "profile", "chrome extension", "3-tier", "autofill"]):
+                sections["architecture"].append(stripped)
+            elif stripped.startswith("- [x]"):
+                sections["phases"].append(stripped[6:])
+        
+        elif current_section == "phases":
+            if stripped.startswith("- [x]"):
+                sections["phases"].append(stripped[6:])
+            elif stripped.startswith("| ") and "Iteration" not in stripped and "---" not in stripped and "Date" not in stripped:
+                parts = [p.strip() for p in stripped.split("|") if p.strip()]
+                if len(parts) >= 3:
+                    sections["phases"].append(f"Iteration {parts[0]}: {parts[2]} ({parts[1]})")
+        
+        elif current_section == "commits":
+            if stripped.startswith("- "):
+                sections["commits"].append(stripped)
+    
+    # Build compressed output
+    out = []
+    
+    # Metadata
+    out.extend(sections["metadata"])
+    out.append("")
+    
+    # Tech stack (compact)
+    if sections["tech_stack"]:
+        deps = [l.split('"')[1] for l in sections["tech_stack"] if '"' in l and ':' in l and '@' not in l.split('"')[1]]
+        if deps:
+            out.append(f"Tech stack: {', '.join(deps[:15])}")
+            out.append("")
+    
+    # Architecture highlights
+    if sections["architecture"]:
+        out.append("ARCHITECTURE:")
+        for a in sections["architecture"][:10]:
+            out.append(f"  {a}")
+        out.append("")
+    
+    # Features (the gold)
+    if sections["features"]:
+        out.append("ALL FEATURES:")
+        seen = set()
+        for f in sections["features"]:
+            clean = f.strip("- *").strip()
+            if clean and clean not in seen and len(clean) > 10:
+                seen.add(clean)
+                out.append(f"  • {clean}")
+        out.append("")
+    
+    # Build phases
+    if sections["phases"]:
+        out.append("BUILD JOURNEY:")
+        for p in sections["phases"][:12]:
+            out.append(f"  • {p}")
+        out.append("")
+    
+    # Commits
+    if sections["commits"]:
+        out.append("RECENT WORK:")
+        for c in sections["commits"][:8]:
+            out.append(f"  {c}")
+    
+    compressed = "\n".join(out)
+    print(f"  [CONTENT] Context compressed: {len(raw_context)} → {len(compressed)} chars")
+    return compressed
 
 
 def _get_multi_repo_context(repo_names: list) -> str:
@@ -152,7 +306,7 @@ def generate_linkedin_post(project_name: str, post_type: str = "project_showcase
     
     instruction = type_instructions.get(post_type, type_instructions["project_showcase"])
     
-    prompt = f"""Write a LinkedIn post about this project. Here is ALL the real data from the repo:
+    prompt = f"""Write a detailed LinkedIn post about this project. Here is ALL the real data from the repo:
 
 {repo_ctx}
 
@@ -162,25 +316,37 @@ Post type: {post_type}
 WRITE THE POST WITH THIS FLOW:
 
 1. THE PROBLEM (3-4 sentences):
-   Open with the real-world problem this project addresses. Make it personal — "As a student in Pakistan, I watched my friends..." or "Every admission season, students across Pakistan face...". Paint the picture so non-technical readers FEEL the frustration. Why does this matter? Who struggles with this?
+   Open with the real-world problem. Make it personal — "As a student in Pakistan, I watched my classmates..." or "Every admission season in Pakistan...". Paint the picture so readers FEEL the frustration. Who faces this problem? How bad is it?
 
-2. THE SOLUTION — HOW WE BUILT IT (3-4 sentences):
-   Now go technical. Name the exact architecture: what framework, what database, what APIs. Explain the key design decisions from the docs — WHY Next.js? WHY Supabase? WHY a Chrome Extension? Connect each tech choice back to solving the problem from section 1.
+2. THE SOLUTION — OUR APPROACH (3-4 sentences):
+   Introduce the project and its core idea. Name the architecture: what framework (Next.js? React?), what database (Supabase?), what browser tech (Chrome Extension?). Explain the key design decisions — WHY these tech choices? Connect each choice back to solving the problem. If there's a CI/CD pipeline or scraper engine, mention it.
 
-3. STANDOUT FEATURES (3-4 sentences):
-   Pick 2-3 specific features from the FEATURES.md or README and describe them in detail. Don't just list them — explain what they DO and why they're useful. Example: "The swipe-based discovery lets students browse universities like Tinder — swipe right to save, left to skip. Behind the scenes, a smart filter considers grade level, program type, and hostel availability."
+3. KEY FEATURES — BE COMPREHENSIVE (8-12 sentences):
+   This is the BIGGEST section. Go through the README and FEATURES.md and list ALL the major features with detail. For EACH feature, explain what it does for the user in one sentence. Include features like:
+   - The swipe/discovery system
+   - The filter system (how many filters? what dimensions?)
+   - The admission chance predictor (how does it work?)
+   - The Chrome Extension autofill (3-tier system? how many universities?)
+   - The profile system (how many sections? how many columns?)
+   - The application dashboard (kanban board?)
+   - Entry tests, scholarships, deadlines, comparison tools
+   - Any AI features (SOP helper, field mapping?)
+   DO NOT skip features — mention as many as the data supports.
 
-4. WHAT'S NEXT + REPO LINK (1-2 sentences):
-   End with what you're working on next (from commits or PROGRESS.md if available), and link the repo.
+4. BUILD JOURNEY (2-3 sentences):
+   How many iterations/phases? What was the progression? Reference the CHANGELOG or PROGRESS docs.
+
+5. WHAT'S NEXT + REPO LINK (1-2 sentences):
+   End with what's coming next and the GitHub repo link.
+
+6. HASHTAGS: 4-6 relevant hashtags
 
 CRITICAL RULES:
 - ONLY use facts from the data above — NEVER invent metrics or user counts
-- Be BOTH human (the story, the why) AND technical (the how, the architecture)
-- Write detailed paragraphs, NOT bullet points — this should feel like a story
-- TARGET 250-350 words (longer than typical, but more engaging)
+- TARGET 400-500 words — this should be a DETAILED post
+- Write detailed paragraphs, NOT bullet points
 - NO preamble like "Here's a draft" — output ONLY the post itself
-- Include the actual GitHub repo URL from the data
-- End with 3-5 relevant hashtags
+- Include the actual GitHub repo URL
 - Write as Bilal Ahmad Sheikh, first person"""
 
     result = generate(prompt, content_type="linkedin_post")
@@ -188,11 +354,11 @@ CRITICAL RULES:
     # Post-processing: strip AI preamble
     result = _clean_post(result, project_name)
     
-    # Enforce character limit (generous for longer posts)
-    if len(result) > 2200:
-        truncated = result[:2200]
+    # Enforce character limit (generous for detailed posts)
+    if len(result) > 3500:
+        truncated = result[:3500]
         last_period = truncated.rfind('.')
-        if last_period > 1500:
+        if last_period > 2500:
             result = truncated[:last_period + 1]
     
     # Ensure repo link is present

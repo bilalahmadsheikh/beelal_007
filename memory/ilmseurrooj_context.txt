@@ -1,0 +1,345 @@
+﻿[GITHUB] Using cached repos (20 repos)
+[GITHUB] Using cached commits (30 commits)
+=== PROJECT: IlmSeUrooj ===
+Language: JavaScript
+Description: No description
+URL: https://github.com/bilalahmadsheikh/IlmSeUrooj
+Last updated: 2026-02-22
+
+=== README.md ===
+# UniMatch (IlmSeUrooj)
+### One profile. Apply to any university in Pakistan.
+
+UniMatch helps Pakistani students apply to multiple universities without filling the same form over and over. Create your profile once — your name, CNIC, marks, contact info — then install the Chrome extension and autofill any supported university portal in seconds. You review the form and click Submit yourself.
+
+---
+
+## What Works Right Now
+
+### Website (localhost:3000)
+- **Swipe-based university discovery** — swipe right to save, left to skip (Tinder-style)
+- **Smart filter system** — field, degree level, program, hostel, city, campus type
+- **Saved universities list** — persistent via localStorage, with tags, notes, reordering, drag-and-drop
+- **Admission chance predictor** — merit formula calculator with projected/IBCC support per university
+- **University comparison tool** — side-by-side comparison of up to 4 universities
+- **Admissions deadlines tracker** — grouped by field and month with countdown
+- **Entry tests info** — NET, ECAT, SAT, MDCAT with historical cutoffs and personal score comparison
+- **Scholarships panel** — need-based and merit-based scholarships with eligibility
+- **Recommendations section** — personalized suggestions based on filters
+- **Similar universities** — based on saved list similarity
+- **Theme system** — dark/light mode with persistent preference
+- **Profile page** — 9 sections: personal, academic, education system (Pakistani/Cambridge), entry tests, portal credentials, preferences, documents
+- **Profile completion ring** — percentage-based SVG in header
+- **Floating action panel** — bottom-right FAB with quick links (hidden on profile/applications/extension)
+- **Application dashboard** — kanban board (Saved → Applying → Submitted → Decision) with real-time updates, detail panel, notes
+- **Header** — auth-aware with Sign In/Create Profile for guests, ProfileRing + dropdown for logged-in users
+- **Extension landing page** — product page with install CTA, how-it-works, university grid, comparison table
+
+### Chrome Extension
+- **Per-university autofill** with 3-tier system (deterministic selectors → AI field mapping → heuristic detection)
+- **17 universities** with mapped CSS selectors (all pending live verification)
+- **Academic status aware** — handles projected marks, IBCC equivalence, Cambridge/Pakistani systems
+- **Sidebar** with 7 states: unknown_portal, not_logged_in, warning_ibcc, warning_no_marks, loading, ready, filled, review, submitted
+- **Popup** with ProfileRing, portal detection, application list, auth controls
+- **Password vault** — generates one strong password, reuses across all portals
+- **Pre-submit validator** — checks for empty required fields and inconsistencies
+- **Submission detection** — captures confirmation numbers
+- **Answer memory** — remembers answers to unique questions across universities
+- **SOP/essay AI draft helper** — uses local Ollama to generate drafts (requires 20-char edit minimum)
+- **Page type de
+
+=== package.json ===
+{
+  "name": "ilmseurroj",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test-scrapers": "node scripts/test-scrapers.js",
+    "test-file-updates": "node scripts/test-file-updates.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.97.0",
+    "next": "16.1.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@babel/generator": "^7.23.0",
+    "@babel/parser": "^7.23.0",
+    "@babel/traverse": "^7.23.0",
+    "@types/node": "^25.3.0",
+    "@types/react": "^19.2.14",
+    "axios": "^1.6.0",
+    "cheerio": "^1.2.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.1",
+    "puppeteer": "^21.0.0",
+    "recast": "^0.23.0",
+    "sharp": "^0.34.5",
+    "typescript": "^5.9.3"
+  }
+}
+
+
+=== docs/FEATURES.md ===
+# UniMatch — Feature Inventory
+Last updated: 2026-02-22
+
+---
+
+## 1. Swipe-Based University Discovery
+**Status:** ✅ Working
+**What it does:** Students discover universities by swiping right (save) or left (skip), similar to Tinder-style card browsing.
+**How it works:** `SwipeCard` component renders cards from `rankUniversities()` in `src/utils/ranking.js`. Touch/mouse drag + keyboard arrows supported. Cards stack with peek-ahead.
+**Education system aware:** No — shows all universities regardless of system.
+**Connected to:** Filter system, Saved list (swipe right adds to saved), ranking utility.
+
+---
+
+## 2. Smart Filter System
+**Status:** ✅ Working
+**What it does:** Filters universities by field of study, degree level, program, hostel availability, city, and campus type.
+**How it works:** `FilterSection` component in `src/components/FilterSection/`. Applies filters to `universities.js` data before ranking.
+**Education system aware:** No.
+**Connected to:** University list, Swipe cards, Recommendations.
+
+---
+
+## 3. Saved Universities List
+**Status:** ✅ Working
+**What it does:** Persistent shortlist with tagging, notes, reordering, drag-and-drop, and bulk comparison.
+**How it works:** `SavedList` component. Data stored in localStorage via `src/utils/savedStorage.js`. Supports tags (Reach/Match/Safety), notes, drag reorder, and compare selection.
+**Education system aware:** No.
+**Connected to:** Swipe cards (swipe right saves), Similar universities, Comparison tool.
+
+---
+
+## 4. Admission Chance Predictor
+**Status:** ✅ Working
+**What it does:** Calculates a student's merit aggregate per university using official merit formulas, comparing against historical cutoffs.
+**How it works:** `AdmissionPredictor` component. Inputs: FSc %, Matric %, test score. Uses per-university weight formulas. Shows Good/Moderate/Low chance.
+**Education system aware:** Yes — accepts IBCC equivalent % for Cambridge students; handles projected marks for Part-I only students.
+**Connected to:** `useP
+
+=== docs/CHANGELOG.md ===
+# IlmSeUrooj - Complete Development History
+
+All iterations of the IlmSeUrooj (UniMatch) project documented in one place.
+
+---
+
+## Project Timeline
+
+| Iteration | Date | Focus Area |
+|-----------|------|------------|
+| 1 | 2026-01-12 | Core swipe interface, filters, 15 universities |
+| 2 | 2026-01-12 | University list, rankings, deadlines |
+| 3 | 2026-01-23 | Theme system, backgrounds, comparison tool |
+| 4 | 2026-01-25 | Campus-specific data, 28 universities |
+| 5 | 2026-02-19 | Automated CI/CD pipeline, scraper engine, validators |
+| 6 | 2026-02-19 | Functional scraper implementations, AST file updates, workflow fixes |
+| 7 | 2026-02-20 | Entry tests, scholarships, recommendations, UX enhancements, Supabase |
+| 8 | 2026-02-21 | Chrome extension, 3-tier autofill engine, 17 university configs |
+| 9 | 2026-02-22 | Apply URL corrections, name splitting, extension detection fixes |
+
+---
+
+## Iteration 1: Homepage with Tinder-Style Swiping
+**Date**: 2026-01-12 | **Status**: ✅ Complete
+
+### Overview
+Built the core swipe-based university browsing interface with intelligent filtering and ranking.
+
+### Features Implemented
+
+#### Filter System (6 Filters)
+| Filter | Purpose | Options |
+|--------|---------|---------|
+| Field/Category | Main study area | Pre-Engineering, CS, Business, Medical, Others |
+| Degree Level | Academic level | Any, Undergraduate, Associate |
+| Program | Specific major | Dynamic based on field selection |
+| Hostel/Campus | Accommodation | On-Campus with Hostel, without, Hybrid |
+| City/Location | Geographic | Islamabad, Lahore, Karachi, Topi, etc. |
+| Campus Type | Culture focus | Research-Oriented, Industry-Focused, Strong Campus Life |
+
+#### Swipe Interface
+- **Drag Gestures**: Touch/mouse drag left or right
+- **Buttons**: Save (💚) and Skip (✕) for click-based interaction
+- **Visual Feedback**: Color overlays during swipe
+- **Match Percentage**: Calculated based on filter compatibility
+
+#### Smart Ranking Algorithm
+Priority-based scoring system:
+| Cri
+
+=== docs/architecture.md ===
+# Component Architecture
+
+## Overview
+
+IlmSeUrooj follows a component-based architecture with clear separation of concerns. The application is built with Next.js 16+ using the App Router pattern, with an automated CI/CD pipeline for data updates.
+
+---
+
+## Directory Structure
+
+```
+ilmseurroj/
+├── src/
+│   ├── app/
+│   │   ├── layout.js          # Root layout with ThemeProvider
+│   │   ├── page.js            # Main homepage
+│   │   ├── globals.css        # Global styles and CSS variables
+│   │   └── page.module.css    # Page-specific CSS module
+│   │
+│   ├── components/
+│   │   ├── AdmissionPredictor/
+│   │   │   ├── AdmissionPredictor.js      # Merit calculator with formulas
+│   │   │   └── AdmissionPredictor.module.css
+│   │   │
+│   │   ├── AdmissionsDeadlines/
+│   │   │   ├── AdmissionsDeadlines.js     # Deadline tracker with countdown
+│   │   │   └── AdmissionsDeadlines.module.css
+│   │   │
+│   │   ├── Background/
+│   │   │   ├── AnimatedBackground.js      # Animated background effects
+│   │   │   ├── AnimatedBackground.module.css
+│   │   │   ├── DecorativeImages.js        # Theme-aware decorative elements
+│   │   │   ├── DecorativeImages.module.css
+│   │   │   ├── SectionBackground.js       # Section-specific backgrounds
+│   │   │   └── SectionBackground.module.css
+│   │   │
+│   │   ├── EntryTests/
+│   │   │   ├── EntryTests.js              # Entry test info cards
+│   │   │   └── EntryTests.module.css
+│   │   │
+│   │   ├── FilterSection/
+│   │   │   ├── FilterSection.js           # 6 filter dropdowns container
+│   │   │   └── FilterSection.module.css
+│   │   │
+│   │   ├── Header/
+│   │   │   ├── Header.js                  # Navigation bar with logo and theme toggle
+│   │   │   └── Header.module.css
+│   │   │
+│   │   ├── Icons/
+│   │   │   └── Icons.js                   # SVG icon library (10 icons)
+│   │   │
+│   │   ├── RecommendationsSection/
+│   │   │   ├── RecommendationsSection.js  # "Top picks" based on filters
+│   │   │   └── RecommendationsSection.module.c
+
+=== docs/agent/SCHEMA.md ===
+# UniMatch — Database Schema
+**Source of truth:** Supabase project `nqmvfierglxgjgqjmxmp`
+Last verified: 2026-02-22
+
+---
+
+## Table: profiles
+**Purpose:** Stores all student personal, academic, and portal information.
+**RLS:** Enabled — students can only read/write their own row (`auth.uid() = id`).
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| id | uuid | NO | — | Primary key, matches auth.users.id |
+| full_name | text | NO | — | Student's full name |
+| father_name | text | YES | — | Father's name |
+| cnic | text | YES | — | CNIC number (XXXXX-XXXXXXX-X) |
+| date_of_birth | date | YES | — | Date of birth |
+| gender | text | YES | — | Male/Female/Other |
+| nationality | text | YES | 'Pakistani' | Nationality |
+| religion | text | YES | — | Religion |
+| email | text | NO | — | Primary email (from auth) |
+| phone | text | YES | — | Mobile number |
+| whatsapp | text | YES | — | WhatsApp number |
+| address | text | YES | — | Street address |
+| city | text | YES | — | City |
+| province | text | YES | — | Province |
+| postal_code | text | YES | — | Postal code |
+| education_system | text | YES | 'pakistani' | 'pakistani' or 'cambridge' |
+| inter_type | text | YES | — | FSc Pre-Engineering, Pre-Medical, ICS, etc. |
+| inter_status | text | YES | 'complete' | not_started, part1_only, appearing, result_awaited, complete |
+| secondary_type | text | YES | — | Matric Science, Matric Arts, etc. |
+| fsc_marks | integer | YES | — | FSc total marks obtained (complete) |
+| fsc_total | integer | YES | 1100 | FSc total possible marks |
+| fsc_percentage | numeric | YES | — | FSc percentage |
+| fsc_stream | text | YES | — | FSc group/stream |
+| fsc_year | integer | YES | — | FSc passing year |
+| fsc_board | text | YES | — | FSc board name |
+| fsc_roll_no | text | YES | — | FSc roll number |
+| fsc_school | text | YES | — | FSc college/school name |
+| fsc_part1_marks | integer | YES | — | FSc Part-I marks obtained |
+| fsc_part1_
+
+=== docs/agent/PROGRESS.md ===
+# UniMatch — Build Progress
+Last updated: 2026-02-22
+Built with: Google Antigravity + Claude Opus 4.6
+
+## Current Stage
+Core system complete — website features fully functional, extension autofill engine built with 17 university configs. All selector configs are mapped but marked `verified: false` pending active admissions cycle for live testing.
+
+## Phase Completion
+- [x] Phase 1 — Supabase tables + RLS + Storage bucket
+- [x] Phase 2 — Chrome extension shell (MV3, content script, sidebar, popup)
+- [x] Phase 3 — AI field mapping engine (3-tier: deterministic → Ollama → heuristic)
+- [x] Phase 4 — Pre-submit review + submission tracking
+- [x] Phase 5 — Manual fields + SOP helper + answer memory
+- [x] Phase 6 — All universities + polish (17 universities)
+- [x] Phase 7 — Password vault + context guard + skip Tier 2 for known unis
+- [x] Phase 8 — Data scrapers + validators + GitHub Actions CI/CD
+- [x] Phase 9 — University config fixes + name splitting + extension context guard
+- [x] Phase 10 — Profile schema expansion (78 columns) + profile page rebuild (9 sections)
+- [x] Phase 11 — UI improvements (Header, FloatingPanel, Extension page, Applications kanban, Sidebar states, Popup redesign)
+- [x] Phase 12 — Full documentation rewrite (7 files)
+
+## What Is Fully Working
+
+### Website
+- Swipe-based university discovery with touch/keyboard/mouse
+- Smart filter system (6 dimensions)
+- Saved universities list with tags, notes, reorder, compare
+- Admission chance predictor with merit formulas
+- University comparison tool (up to 4)
+- Admissions deadlines tracker
+- Entry tests info with cutoffs
+- Scholarships panel
+- Recommendations + Similar universities
+- Dark/light theme system
+- Profile page with 9 sections (Pakistani + Cambridge systems)
+- Profile completion ring in header
+- Auth-aware header with dropdown
+- Floating action panel (FAB)
+- Application dashboard with kanban board + real-time
+- Extension landing page
+
+### Chrome Extension
+- 3-tier autofill engine (deterministic →
+
+=== Other docs available (not fetched) ===
+  - docs/agent/DECISIONS.md
+  - docs/DATA-SOURCES.md
+  - docs/DEVELOPMENT-HISTORY.md
+  - docs/DOCUMENTATION-UPDATE-2026-02-19.md
+  - docs/ENHANCEMENTS.md
+  - docs/FILES.md
+  - docs/HOW_TO_ADD_UNIVERSITY.md
+  - docs/README.md
+  - docs/SCRAPERS.md
+  - docs/SHORTFALLS.md
+
+=== RECENT COMMITS (10) ===
+  - docs: rewrite README, FEATURES (32 features), add HOW_TO_ADD_UNIVERSITY and UNIVERSITY_STATUS guides, update schema docs (2026-02-22)
+  - fix: update page.js (2026-02-22)
+  - fix: update extension content script, popup, and profile page styles (2026-02-22)
+  - feat: add useProfile hook, update extension configs and schema docs (2026-02-22)
+  - feat/fix: Chrome extension (Iteration 8) and Apply URL fixes (Iteration 9) - Build Chrome extension (MV3) with Supabase  (2026-02-21)
+  - feat: deterministic autofill engine with 17 per-university selector configs (2026-02-21)
+  - chore: rename project to Ilm Se Urooj and add Urdu translations (2026-02-21)
+  - feat: add nav buttons, smart field detection, consistent passwords, page detection, fix auth & profile (2026-02-21)
+  - chore: organize agent files and add .agent/ to gitignore - Move PROGRESS.md, SCHEMA.md, DECISIONS.md to docs/agent/ - Cr (2026-02-21)
+  - docs: update all documentation for Iteration 7 - Add 8 new components (EntryTests, Icons, RecommendationsSection, Schola (2026-02-21)

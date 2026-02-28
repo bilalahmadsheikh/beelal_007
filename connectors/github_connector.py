@@ -281,7 +281,7 @@ class GitHubConnector:
         # 2. README
         readme = self.get_readme(repo)
         if readme:
-            readme_text = readme[:3000] if len(readme) > 3000 else readme
+            readme_text = readme[:5000] if len(readme) > 5000 else readme
             lines.append(f"\n=== README.md ===\n{readme_text}")
         
         # 3. Scan file tree for docs and important files
@@ -308,7 +308,7 @@ class GitHubConnector:
         for fpath in important_files:
             content = self.get_file_content(repo, fpath)
             if content:
-                content_text = content[:2000] if len(content) > 2000 else content
+                content_text = content[:4000] if len(content) > 4000 else content
                 lines.append(f"\n=== {fpath} ===\n{content_text}")
         
         # 5. Fetch docs/ folder files (up to 5 most relevant)
@@ -321,11 +321,11 @@ class GitHubConnector:
             
             fetched = 0
             for fpath in sorted_docs:
-                if fetched >= 5:
+                if fetched >= 8:
                     break
                 content = self.get_file_content(repo, fpath)
                 if content:
-                    content_text = content[:2000] if len(content) > 2000 else content
+                    content_text = content[:4000] if len(content) > 4000 else content
                     lines.append(f"\n=== {fpath} ===\n{content_text}")
                     fetched += 1
             
