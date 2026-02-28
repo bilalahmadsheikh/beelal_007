@@ -7,7 +7,7 @@ Run an Ollama model with `keep_alive:0` (auto-unload after generation).
 
 | Param | Type | Description |
 |---|---|---|
-| `model` | `str` | Model name (e.g. `gemma3:1b`, `qwen3-4b-thinking`) |
+| `model` | `str` | Model name (e.g. `gemma3:1b`, `gemma3:4b`) |
 | `prompt` | `str` | User prompt |
 | `system` | `str` | Optional system prompt |
 | **Returns** | `str` | Generated text or `[ERROR] ...` message |
@@ -34,7 +34,7 @@ Route a user command to the appropriate agent via Gemma 3 1B.
 | **Returns** | `dict` | `{"agent": str, "task": str, "model": str}` |
 
 **Supported agents:** `nlp`, `content`, `navigation`, `memory`
-**Supported models:** `gemma3:1b`, `phi4-mini`, `qwen3-4b-thinking`, `gemma2:9b`
+**Supported models:** `gemma3:1b`, `phi4-mini`, `gemma3:4b`, `gemma2:9b`
 
 ---
 

@@ -23,7 +23,7 @@ ollama serve   # Start if not
 2. Force unload stuck models:
    ```python
    from tools.model_runner import force_unload
-   force_unload("qwen3-4b-thinking")
+   force_unload("gemma3:4b")
    ```
 3. Check RAM: `python -c "from tools.model_runner import get_free_ram; print(f'{get_free_ram():.1f}GB')"`
 

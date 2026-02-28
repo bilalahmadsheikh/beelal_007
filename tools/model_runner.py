@@ -4,7 +4,7 @@ Handles all Ollama model calls with tiered keep_alive + prompt caching.
 
 Caching Strategy:
 - Orchestrator (gemma3:1b, ~1GB): keep_alive=5m — always warm, KV cache reused
-- Specialists (qwen3-4b-thinking, gemma2:9b): keep_alive=30s — short window for follow-ups
+- Specialists (gemma3:4b, gemma2:9b): keep_alive=30s — short window for follow-ups
 - After specialist finishes: explicit unload to reclaim RAM for next model
 - System prompts are hashed and reused consistently for KV cache hits
 """
@@ -30,7 +30,7 @@ KEEP_ALIVE_TIERS = {
     "gemma3:1b":   "5m",
     
     # Tier 2: Specialists — short window for back-to-back calls
-    "qwen3-4b-thinking":    "30s",
+    "gemma3:4b":       "30s",
     "gemma2:9b":   "30s",
     "phi4-mini":   "30s",
     
@@ -53,14 +53,14 @@ def _hash_system_prompt(system: str) -> str:
     return hashlib.md5(system.encode()).hexdigest()[:8] if system else ""
 
 
-def run_model(model: str, prompt: str, system: str = "", keep_alive: str = None) -> str:
+def run_model(model: str, prompt: str, system: str = "", keep_alive: str = None, num_predict: int = None) -> str:
     """
     Run an Ollama model with tiered keep_alive for KV caching.
     
     The same system prompt → same KV cache prefix → fast TTFT on repeat calls.
     
     Args:
-        model: Model name (e.g. 'gemma3:1b', 'qwen3-4b-thinking')
+        model: Model name (e.g. 'gemma3:1b', 'gemma3:4b')
         prompt: User prompt to send
         system: Optional system prompt (cached in KV when model stays loaded)
         keep_alive: Override keep_alive (uses tier default if None)
@@ -89,6 +89,8 @@ def run_model(model: str, prompt: str, system: str = "", keep_alive: str = None)
     }
     if system:
         payload["system"] = system
+    if num_predict:
+        payload["options"] = {"num_predict": num_predict}
     
     # Log cache status
     sys_hash = _hash_system_prompt(system)
@@ -102,7 +104,7 @@ def run_model(model: str, prompt: str, system: str = "", keep_alive: str = None)
     start = time.time()
     
     try:
-        response = requests.post(url, json=payload, timeout=180)
+        response = requests.post(url, json=payload, timeout=300)
         response.raise_for_status()
         
         elapsed = time.time() - start
@@ -127,7 +129,7 @@ def run_model(model: str, prompt: str, system: str = "", keep_alive: str = None)
     except requests.exceptions.ConnectionError:
         return "[ERROR] Cannot connect to Ollama. Is it running?"
     except requests.exceptions.Timeout:
-        return "[ERROR] Ollama request timed out (180s)."
+        return "[ERROR] Ollama request timed out (300s)."
     except Exception as e:
         return f"[ERROR] {str(e)}"
 
@@ -156,7 +158,7 @@ def force_unload(model: str) -> None:
 
 def unload_all_specialists() -> None:
     """Unload all specialist models, keeping only the router (gemma3:1b)."""
-    for model in ["qwen3-4b-thinking", "gemma2:9b", "phi4-mini"]:
+    for model in ["gemma3:4b", "gemma2:9b", "phi4-mini"]:
         _unload_model(model)
 
 
@@ -171,7 +173,7 @@ def get_free_ram() -> float:
     return mem.available / (1024 ** 3)
 
 
-def safe_run(model: str, prompt: str, required_gb: float = 2.0, system: str = "") -> str:
+def safe_run(model: str, prompt: str, required_gb: float = 2.0, system: str = "", num_predict: int = None) -> str:
     """
     Run a model only if enough RAM is available.
     Automatically unloads competing specialists before loading.
@@ -200,7 +202,7 @@ def safe_run(model: str, prompt: str, required_gb: float = 2.0, system: str = ""
             f"Need {required_gb:.1f}GB, only {free:.1f}GB free. "
             f"Close some apps and retry."
         )
-    return run_model(model, prompt, system)
+    return run_model(model, prompt, system, num_predict=num_predict)
 
 
 if __name__ == "__main__":

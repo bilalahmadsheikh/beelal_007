@@ -62,7 +62,7 @@ projects:
 
 agent_config:
   orchestrator_model: "gemma3:1b"
-  content_model: "qwen3-4b-thinking"
+  content_model: "gemma3:4b"
   fallback_model: "gemma2:9b"
   logic_model: "phi4-mini"
   intelligence_modes:

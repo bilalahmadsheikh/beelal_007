@@ -21,7 +21,7 @@ pip install crewai playwright psutil fastapi uvicorn playwright-stealth python-d
 ollama pull gemma3:1b
 
 # Required (Phase 1+)
-ollama pull qwen3-4b-thinking
+ollama pull gemma3:4b
 
 # Optional fallback
 ollama pull gemma2:9b

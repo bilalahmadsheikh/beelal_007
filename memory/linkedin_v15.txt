@@ -1,0 +1,71 @@
+﻿============================================================
+  BilalAgent v2.0 — Starting Up
+============================================================
+
+[1/4] System RAM: 6.3GB free
+
+[2/4] Initializing database...
+[DB] Database initialized at D:\beelal_007\memory\agent_memory.db
+
+[3/4] Loading profile...
+       Profile: Bilal Ahmad Sheikh (4 projects)
+
+[4/4] Syncing GitHub...
+[GITHUB] Using cached repos (20 repos)
+       Found 20 repos
+
+============================================================
+  Agent Ready
+============================================================
+
+────────────────────────────────────────────────────────────
+Command: "write a linkedin post about IlmSeUrooj covering the chrome extension autofill engine and all website features"
+────────────────────────────────────────────────────────────
+
+[STEP 1] Routing via Orchestrator (gemma3:1b)...
+  [TIMING] gemma3:1b: TTFT=12.9s | 42 tokens | 16.4 tok/s | keep_alive=5m
+         Routing: {
+  "agent": "content",
+  "task": "write_post",
+  "model": "qwen3-4b-thinking"
+}
+
+[STEP 2] Executing via content agent (model: qwen3-4b-thinking)...
+  → LinkedIn post about: ilmseurooj covering the chrome extension autofill engine and all website features
+[GITHUB] Using cached repos (20 repos)
+  [CONTENT] Matched repo: IlmSeUrooj
+  [CONTENT] Fetching deep context (README + docs/ + commits)...
+[GITHUB] Using cached repos (20 repos)
+[GITHUB] Using cached commits (30 commits)
+  [CONTENT] Context compressed: 39697 → 5045 chars
+  [UNLOAD] gemma3:1b freed from RAM
+[CONTENT] Using Qwen3 4B Thinking (primary) — 7.7GB free
+[CONTENT] Qwen3 4B failed: [ERROR] Ollama request timed out (300s).
+[CONTENT] Using Gemma3 1B (last resort) — 4.0GB free
+  [TIMING] gemma3:1b: TTFT=19.0s | 1111 tokens | 32.8 tok/s | keep_alive=5m
+[GITHUB] Using cached repos (20 repos)
+
+────────────────────────────────────────────────────────────
+RESULT:
+────────────────────────────────────────────────────────────
+**Pakistan’s Future, One Swipe at a Time: Introducing IlmSeUrooj**
+
+As a student in Pakistan, I’ve always felt a frustrating disconnect – a gap between the opportunities available and the systems that truly help us navigate the university application process. It’s a constant scramble, a feeling of being adrift in a sea of forms and requirements.  The sheer volume of applications, the varying requirements across institutions – it can feel overwhelming. It's especially frustrating when you're trying to secure a place at a dream university, only to realize the process feels almost impossible.  Imagine spending hours meticulously filling out each section, knowing there’s a chance you might miss something crucial.  It’s a hurdle that can significantly impact a student's chances.
+
+That’s why I’ve been dedicating my time to building IlmSeUrooj – a project aimed to streamline and enhance the university application experience, especially for students like me.  I've envisioned a system that cuts through the clutter and provides a more intuitive, personalized journey.  The core idea is a robust, component-based application architecture – a crucial design choice to maintain modularity and testability.  We're choosing Next.js 16+ for its performance and developer-friendly features, leveraging the App Router pattern to create a seamless user experience. 
+
+Let's dive into the specifics of the approach. We’ve opted for a component-based architecture, which is fundamental. This allows us to build a system with clear separation of concerns – each component focusing on a specific task:  the 'Toast.js' component handles notifications, the 'Profile' component – the heart of our experience, – manages student data, and the ‘University Comparison’ component - gives students the ability to compare universities side by side.  The  **RLS** component is vital, ensuring that students *only* have read/write access to their own profile data, drastically improving security and simplifying the data management process.  It’s a foundational security practice, ensuring student data stays private.
+
+
+The application is built with Supabase as our database backend, chosen for its reliability and scalability. The Supabase project `nqmvfierglxggqjmxmp` – a foundational project – houses all the required tables and functions.  We’ve also built a robust CI/CD pipeline – with a scraper engine to gather real-time data for the most up-to-date information, ensuring our system always aligns with the latest updates. We utilized a pre-defined AST (Abstract Syntax Tree) to manage form data, offering a clean and predictable interface.
+
+We've structured the application with a carefully thought-out UI design. We’ve created the 'Swipe-based University Discovery' feature - that is, we've implemented a 'swipe right to save' mechanism, providing students with a quick and intuitive way to browse university portals.  The filtering system is extremely detailed: we’ve added 17 universities, each with a dedicated CSS selector, to offer targeted discovery.  We've also incorporated Smart Filter, enabling advanced searching with fields, degree level, program, hostel, city, and campus type - this is a massive boost for ease of finding the right university.  The admission chance predictor uses a merit formula calculator to provide a projected mark based on IBCC equivalence and projected marks per university, offering a clear indication of likelihood.
+
+🔗 https://github.com/bilalahmadsheikh/IlmSeUrooj
+
+#OpenSource #GitHub #WebDev #BuildInPublic
+
+────────────────────────────────────────────────────────────
+Words: 515 | Chars: 3538
+RAM: 6.3GB → 6.5GB (delta: +0.2GB)
+────────────────────────────────────────────────────────────

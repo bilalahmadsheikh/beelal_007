@@ -1,7 +1,7 @@
 """
 content_agent.py — BilalAgent v2.0 Content Generation Agent
 Professional Content Strategist for AI/ML Developers.
-Primary: Qwen3 4B Thinking (reasoning + quality output, 2.5GB)
+Primary: Gemma 3 4B (best 4B content model, same family as orchestrator, 3.3GB)
 Fallback: Gemma 2 9B (reliable, well-tested)
 """
 
@@ -61,22 +61,28 @@ def generate(prompt: str, content_type: str = "general") -> str:
     """
     free = get_free_ram()
     
-    # Try Qwen3 4B Thinking first (best quality with reasoning)
-    if free >= 2.5:
-        print(f"[CONTENT] Using Qwen3 4B Thinking (primary) — {free:.1f}GB free")
-        result = safe_run("qwen3-4b-thinking", prompt, required_gb=2.5, system=CONTENT_SYSTEM_PROMPT)
+    # Try Gemma 3 4B first (best quality, same family as orchestrator)
+    if free >= 3.0:
+        # Unload orchestrator to free RAM for specialist
+        from tools.model_runner import force_unload
+        force_unload("gemma3:1b")
+        import time; time.sleep(1)
+        free = get_free_ram()
         
-        # Strip thinking tags if present (Qwen3 hybrid mode)
-        result = _strip_thinking(result)
+        print(f"[CONTENT] Using Gemma 3 4B (primary) — {free:.1f}GB free")
+        result = safe_run("gemma3:4b", prompt, required_gb=3.0, system=CONTENT_SYSTEM_PROMPT)
         
         if not result.startswith("[ERROR]") and len(result) > 100:
             return result
         
+        # Log the error so user knows WHY it failed
+        if result.startswith("[ERROR]"):
+            print(f"[CONTENT] Gemma 3 4B failed: {result}")
+        
         # Quality check failed — retry once
         if not result.startswith("[ERROR]") and len(result) < 150:
-            print("[CONTENT] Output too short, retrying with Qwen3 4B Thinking...")
-            result = safe_run("qwen3-4b-thinking", prompt + "\n\nIMPORTANT: Write a complete, detailed response of at least 250 words.", required_gb=2.5, system=CONTENT_SYSTEM_PROMPT)
-            result = _strip_thinking(result)
+            print("[CONTENT] Output too short, retrying with Gemma 3 4B...")
+            result = safe_run("gemma3:4b", prompt + "\n\nIMPORTANT: Write a complete, detailed response of at least 250 words.", required_gb=3.0, system=CONTENT_SYSTEM_PROMPT)
             if not result.startswith("[ERROR]"):
                 return result
     

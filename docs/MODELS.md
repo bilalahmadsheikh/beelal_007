@@ -5,7 +5,7 @@
 | Model | Ollama Name | Size | RAM Usage | Role | Status |
 |---|---|---|---|---|---|
 | Gemma 3 1B | `gemma3:1b` | ~815 MB | ~1 GB | Orchestrator + NLP fallback | ✅ Installed & Tested |
-| Qwen3 4B Thinking | `qwen3-4b-thinking` | ~2.5 GB | ~2.5 GB | Content Primary | ⬜ Pending |
+| Gemma 3 4B | `gemma3:4b` | ~3.3 GB | ~3.3 GB | Content Primary | ✅ Installed |
 | Gemma 2 9B | `gemma2:9b` | ~5.4 GB | ~6 GB | Content Fallback | ⬜ Optional |
 | Phi-4 Mini | `phi4-mini` | ~2.5 GB | ~3 GB | Logic / Scoring | ⬜ Optional |
 
@@ -64,7 +64,7 @@ Requested model (e.g. phi4-mini)
 
 ```bash
 ollama pull gemma3:1b     # Phase 0 — ✅ installed
-ollama create qwen3-4b-thinking -f Modelfile.qwen3-4b  # Phase 1+ — for content generation
+ollama pull gemma3:4b        # Phase 1+ — for content generation
 ollama pull gemma2:9b     # Optional fallback
 ollama pull phi4-mini     # Optional for scoring
 ```

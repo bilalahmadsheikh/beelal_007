@@ -1,0 +1,83 @@
+﻿============================================================
+  BilalAgent v2.0 — Starting Up
+============================================================
+
+[1/4] System RAM: 8.5GB free
+
+[2/4] Initializing database...
+[DB] Database initialized at D:\beelal_007\memory\agent_memory.db
+
+[3/4] Loading profile...
+       Profile: Bilal Ahmad Sheikh (4 projects)
+
+[4/4] Syncing GitHub...
+[GITHUB] Using cached repos (20 repos)
+       Found 20 repos
+
+============================================================
+  Agent Ready
+============================================================
+
+────────────────────────────────────────────────────────────
+Command: "write a linkedin post about IlmSeUrooj covering all features including the chrome extension architecture and autofill engine"
+────────────────────────────────────────────────────────────
+
+[STEP 1] Routing via Orchestrator (gemma3:1b)...
+  [TIMING] gemma3:1b: TTFT=5.1s | 42 tokens | 10.2 tok/s | keep_alive=5m
+         Routing: {
+  "agent": "content",
+  "task": "write_post",
+  "model": "qwen3-4b-thinking"
+}
+
+[STEP 2] Executing via content agent (model: qwen3-4b-thinking)...
+  → LinkedIn post about: ilmseurooj covering all features including the chrome extension architecture and autofill engine
+[GITHUB] Using cached repos (20 repos)
+  [CONTENT] Matched repo: IlmSeUrooj
+  [CONTENT] Fetching deep context (README + docs/ + commits)...
+[GITHUB] Using cached repos (20 repos)
+[GITHUB] Using cached commits (30 commits)
+  [CONTENT] Context compressed: 39697 → 5045 chars
+  [UNLOAD] gemma3:1b freed from RAM
+[CONTENT] Using Qwen3 4B Thinking (primary) — 8.5GB free
+[CONTENT] Qwen3 4B failed: [ERROR] Ollama request timed out (180s).
+[CONTENT] Using Gemma3 1B (last resort) — 4.2GB free
+  [TIMING] gemma3:1b: TTFT=46.3s | 1195 tokens | 22.2 tok/s | keep_alive=5m
+[GITHUB] Using cached repos (20 repos)
+
+────────────────────────────────────────────────────────────
+RESULT:
+────────────────────────────────────────────────────────────
+**IlmSeUrooj: Leveling Up University Discovery in Pakistan**
+
+As a student in Pakistan, I’ve spent a lot of time navigating the complex world of university applications.  It's frustrating to sift through endless forms, miss out on opportunities, and feel like I’m not getting the full picture. It’s hard to know *exactly* which universities are the best fit for you, especially when you’re balancing everything – exams, family expectations, and a whole lot of application deadlines.  It feels like a constant uphill battle.  I saw so many students struggling with this, and I realized there had to be a better way to connect students with the right institutions. That’s why I’ve been working on IlmSeUrooj – a project born out of that frustration.
+
+
+**Our Approach: A Supabase, React, & Next.js Powered University Discovery Engine**
+
+IlmSeUrooj is a Next.js 16+ app built on Supabase, React, and Next.js, specifically designed to streamline the university application process. We’ve chosen this stack because it offers a solid balance of performance and developer experience. Supabase is our database, providing a reliable backend with excellent features – particularly for managing user data and connecting to various university APIs. Next.js’s component-based architecture is key, giving us modularity and ease of maintainability. It allows us to build a user-friendly, visually appealing interface, while maintaining a clean and organized codebase. We’ve gone all-in on the App Router pattern for a seamless user experience.
+
+
+
+**Key Features - Let's dive in!**
+
+*   **Swipe-Based Discovery:**  The core of the experience is a swipe-based interface that pulls up university profiles. Think Tinder, but for universities. Students can swipe right to save universities, left to skip, which is incredibly intuitive. The design allows for quick browsing and a highly engaging discovery process.  The UI was designed with accessibility in mind – we’ve used a dark/light mode theme with persistent preferences.
+
+*   **Smart Filter System:**  We've built a powerful filter system using a combination of fields (program, degree level, hostel, city, campus type, and the student's status – projected marks, IBCC equivalence), making it incredibly easy for students to narrow down their options. The filters are dynamic and automatically adjust as students refine their search.
+
+*   **Saved Universities List:** This is a big part – we’ve implemented a persistent list of saved universities, stored in localStorage to ensure data is always available.  We also have tags, notes, reordering, drag-and-drop functionality – all designed to give students the control and flexibility they need.
+
+*   **Admission Chance Predictor:**  We’ve created a simple admission chance predictor that uses merit formulas, projected marks, and IBCC equivalence to provide a rough estimate of the potential success rate for each university.  It's not a definitive prediction, but it gives students a solid starting point. 3-tier selector system -deterministic selectors, Ollama, heuristic detection – all designed to ensure accuracy.
+
+*   **University Comparison Tool:** Side-by-side comparison of up to 4 universities, complete with detailed information and a clear ranking system.
+
+*   **Entry Tests Info:** We’ve incorporated a comprehensive entry tests section, including NET, ECAT, SAT, MDCAT with historical cutoffs, and personalized score comparison. The system also handles student profiles across various universities.
+
+🔗 https://github.com/bilalahmadsheikh/IlmSeUrooj
+
+#OpenSource #GitHub #WebDev #BuildInPublic
+
+────────────────────────────────────────────────────────────
+Words: 523 | Chars: 3592
+RAM: 8.5GB → 7.1GB (delta: -1.4GB)
+────────────────────────────────────────────────────────────
