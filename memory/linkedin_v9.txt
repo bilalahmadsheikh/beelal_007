@@ -1,0 +1,85 @@
+﻿============================================================
+  BilalAgent v2.0 — Starting Up
+============================================================
+
+[1/4] System RAM: 6.9GB free
+
+[2/4] Initializing database...
+[DB] Database initialized at D:\beelal_007\memory\agent_memory.db
+
+[3/4] Loading profile...
+       Profile: Bilal Ahmad Sheikh (4 projects)
+
+[4/4] Syncing GitHub...
+[GITHUB] Using cached repos (20 repos)
+       Found 20 repos
+
+============================================================
+  Agent Ready
+============================================================
+
+────────────────────────────────────────────────────────────
+Command: "write a linkedin post about IlmSeUrooj"
+────────────────────────────────────────────────────────────
+
+[STEP 1] Routing via Orchestrator (gemma3:1b)...
+  [TIMING] gemma3:1b: TTFT=5.6s | 42 tokens | 8.2 tok/s | keep_alive=5m
+         Routing: {
+  "agent": "content",
+  "task": "write_post",
+  "model": "qwen3-4b-thinking"
+}
+
+[STEP 2] Executing via content agent (model: qwen3-4b-thinking)...
+  → LinkedIn post about: ilmseurooj
+[GITHUB] Using cached repos (20 repos)
+  [CONTENT] Matched repo: IlmSeUrooj
+  [CONTENT] Fetching deep context (README + docs/ + commits)...
+[GITHUB] Using cached repos (20 repos)
+[GITHUB] Fetching README for IlmSeUrooj...
+[GITHUB] Fetching file tree for IlmSeUrooj...
+[GITHUB] Fetching IlmSeUrooj/package.json...
+[GITHUB] Fetching IlmSeUrooj/docs/FEATURES.md...
+[GITHUB] Fetching IlmSeUrooj/docs/CHANGELOG.md...
+[GITHUB] Fetching IlmSeUrooj/docs/architecture.md...
+[GITHUB] Fetching IlmSeUrooj/docs/agent/SCHEMA.md...
+[GITHUB] Fetching IlmSeUrooj/docs/agent/PROGRESS.md...
+[GITHUB] Fetching IlmSeUrooj/docs/agent/DECISIONS.md...
+[GITHUB] Fetching IlmSeUrooj/docs/DATA-SOURCES.md...
+[GITHUB] Fetching IlmSeUrooj/docs/DEVELOPMENT-HISTORY.md...
+[GITHUB] Using cached commits (30 commits)
+  [CONTENT] Context compressed: 39697 → 5045 chars
+[CONTENT] Using Qwen3 4B Thinking (primary) — 5.5GB free
+[CONTENT] Using Gemma3 1B (last resort) — 1.9GB free
+  [TIMING] gemma3:1b: TTFT=37.5s | 1745 tokens | 23.3 tok/s | keep_alive=5m
+[GITHUB] Using cached repos (20 repos)
+
+────────────────────────────────────────────────────────────
+RESULT:
+────────────────────────────────────────────────────────────
+**The Struggle Within: Building a Passport to Future University Doors**
+
+As a student in Pakistan, I've spent countless evenings staring at university application portals, feeling a familiar frustration - the endless, repetitive process of filling out the same forms over and over. It’s a constant reminder that opportunity isn't equal, and navigating the higher education system can feel incredibly daunting. We’re talking about millions of students, all striving for a better future, and often facing similar obstacles in a system that can be opaque and difficult to navigate.
+
+That's why I've been pouring my heart (and a surprising amount of JavaScript!) into IlmSeUrooj – a project born out of a simple observation: the way students struggle to find the right universities.  It started with noticing a pattern: students were wasting time, scrolling through countless options, and ultimately, giving up.  It felt wasteful, inefficient, and frankly, a little hopeless.  The sheer volume of information – the thousands of universities, the sprawling data – was overwhelming.  
+
+So, we’re building IlmSeUrooj – a Next.js 16+ app specifically designed to alleviate this pain point.  The core idea is a streamlined university discovery experience, but it's more than just a tool; it's a complete system.  We've chosen Next.js 16+ for its robust routing capabilities and the App Router pattern - a crucial decision to create a truly modular and maintainable application.  We’re leveraging the power of Supabase as our backend, crucial for handling user data efficiently.  The RLS (Relational Schema) is a core component; it’s our way of ensuring consistency and providing a consistent data structure across all university profiles.
+
+Let’s break down the key features:
+
+*   **Swipe-Based University Discovery:**  The foundation. We’ve implemented a "swipe-right save, swipe left skip" mechanism that mimics the Tinder effect.  Each university is represented by a visually appealing profile, allowing students to quickly scan and find relevant institutions based on their interests.  It’s a surprisingly intuitive way to quickly sift through the vast database – a huge improvement over laborious manual searching. We're actively working on refinement with a ‘swipe-based’ algorithm to refine the student results.
+
+*   **Smart Filter System:** This is where things get really interesting. We've built a sophisticated filter system – but not just *any* filter system. We've implemented a three-tier system using deterministic selectors, Ollama (for a reliable and secure field mapping) and a heuristic detection engine. This means the system automatically applies CSS selectors – like the ‘name,’ ‘degree,’ ‘program,’ and ‘hostel’ – based on the data to create relevant filter recommendations. We’re also incorporating the ability to set preferences for fields like 'past year mark' and 'Cambridge/Pakistani systems' – this will be incredibly valuable for students with diverse background.
+
+*   **Saved Universities List:** We’re leveraging localStorage for persistent storage, providing a delightful, visually appealing list of saved universities. It's not just a simple list – we’ve added tags, notes (using a Markdown-style system), reordering, and drag-and-drop functionality to make it much more engaging.
+
+*   **Admission Chance Predictor:** This is a big one! We’ve built a Merit Formula Calculator with projected/IBCC support per university.
+
+🔗 https://github.com/bilalahmadsheikh/IlmSeUrooj
+
+#OpenSource #GitHub #WebDev #BuildInPublic
+
+────────────────────────────────────────────────────────────
+Words: 516 | Chars: 3537
+RAM: 6.9GB → 6.0GB (delta: -0.9GB)
+────────────────────────────────────────────────────────────

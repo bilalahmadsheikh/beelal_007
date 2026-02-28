@@ -1,0 +1,216 @@
+﻿[GITHUB] Using cached repos (20 repos)
+  [CONTENT] Matched repo: IlmSeUrooj
+  [CONTENT] Fetching deep context (README + docs/ + commits)...
+[GITHUB] Using cached repos (20 repos)
+[GITHUB] Using cached commits (30 commits)
+  [CONTENT] Context compressed: 39697 → 15379 chars
+=== PROJECT: IlmSeUrooj ===
+Language: JavaScript
+Description: No description
+URL: https://github.com/bilalahmadsheikh/IlmSeUrooj
+Last updated: 2026-02-22
+
+Tech stack: name, version, private, scripts, dev, build, start, lint, test-scrapers, test-file-updates, dependencies, next, react, react-dom, devDependencies
+
+ARCHITECTURE:
+  # Component Architecture
+  Overview
+  IlmSeUrooj follows a component-based architecture with clear separation of concerns. The application is built with Next.js 16+ using the App Router pattern, with an automated CI/CD pipeline for data updates.
+  Directory Structure
+  │   ├── components/
+  │   │   │   ├── Toast.js                   # Toast notification component
+  **Source of truth:** Supabase project `nqmvfierglxgjgqjmxmp`
+  Table: profiles
+  **RLS:** Enabled — students can only read/write their own row (`auth.uid() = id`).
+
+ALL FEATURES:
+  • Section: One profile. Apply to any university in Pakistan.
+  • Section: Website (localhost:3000)
+  • Swipe-based university discovery** — swipe right to save, left to skip (Tinder-style)
+  • Smart filter system** — field, degree level, program, hostel, city, campus type
+  • Saved universities list** — persistent via localStorage, with tags, notes, reordering, drag-and-drop
+  • Admission chance predictor** — merit formula calculator with projected/IBCC support per university
+  • University comparison tool** — side-by-side comparison of up to 4 universities
+  • Admissions deadlines tracker** — grouped by field and month with countdown
+  • Entry tests info** — NET, ECAT, SAT, MDCAT with historical cutoffs and personal score comparison
+  • Scholarships panel** — need-based and merit-based scholarships with eligibility
+  • Recommendations section** — personalized suggestions based on filters
+  • Similar universities** — based on saved list similarity
+  • Theme system** — dark/light mode with persistent preference
+  • Profile page** — 9 sections: personal, academic, education system (Pakistani/Cambridge), entry tests, portal credentials, preferences, documents
+  • Profile completion ring** — percentage-based SVG in header
+  • Floating action panel** — bottom-right FAB with quick links (hidden on profile/applications/extension)
+  • Application dashboard** — kanban board (Saved → Applying → Submitted → Decision) with real-time updates, detail panel, notes
+  • Header** — auth-aware with Sign In/Create Profile for guests, ProfileRing + dropdown for logged-in users
+  • Extension landing page** — product page with install CTA, how-it-works, university grid, comparison table
+  • Section: Chrome Extension
+  • Per-university autofill** with 3-tier system (deterministic selectors → AI field mapping → heuristic detection)
+  • 17 universities** with mapped CSS selectors (all pending live verification)
+  • Academic status aware** — handles projected marks, IBCC equivalence, Cambridge/Pakistani systems
+  • Sidebar** with 7 states: unknown_portal, not_logged_in, warning_ibcc, warning_no_marks, loading, ready, filled, review, submitted
+  • Popup** with ProfileRing, portal detection, application list, auth controls
+  • Password vault** — generates one strong password, reuses across all portals
+  • Pre-submit validator** — checks for empty required fields and inconsistencies
+  • Submission detection** — captures confirmation numbers
+  • Answer memory** — remembers answers to unique questions across universities
+  • SOP/essay AI draft helper** — uses local Ollama to generate drafts (requires 20-char edit minimum)
+  • Page type detection** — identifies login, registration, application, and payment pages
+  • Section: Supported Universities (17 — all mapped, pending live verification)
+  • Feature: Quick Start
+  • Section: Prerequisites
+  • A Supabase project (free tier works)
+  • Chrome browser (for extension)
+  • Section: 1. Clone and install
+  • Section: 2. Environment variables
+  • Section: 3. Run the website
+  • Section: 4. Load the extension in Chrome
+  • Feature: 1. Swipe-Based University Discovery
+  • Status:** ✅ Working
+  • What it does:** Students discover universities by swiping right (save) or left (skip), similar to Tinder-style card browsing.
+  • How it works:** `SwipeCard` component renders cards from `rankUniversities()` in `src/utils/ranking.js`. Touch/mouse drag + keyboard arrows supported. Cards stack with peek-ahead.
+  • Education system aware:** No — shows all universities regardless of system.
+  • Connected to:** Filter system, Saved list (swipe right adds to saved), ranking utility.
+  • Feature: 2. Smart Filter System
+  • What it does:** Filters universities by field of study, degree level, program, hostel availability, city, and campus type.
+  • How it works:** `FilterSection` component in `src/components/FilterSection/`. Applies filters to `universities.js` data before ranking.
+  • Education system aware:** No.
+  • Connected to:** University list, Swipe cards, Recommendations.
+  • Feature: 3. Saved Universities List
+  • What it does:** Persistent shortlist with tagging, notes, reordering, drag-and-drop, and bulk comparison.
+  • How it works:** `SavedList` component. Data stored in localStorage via `src/utils/savedStorage.js`. Supports tags (Reach/Match/Safety), notes, drag reorder, and compare selection.
+  • Connected to:** Swipe cards (swipe right saves), Similar universities, Comparison tool.
+  • Feature: 4. Admission Chance Predictor
+  • What it does:** Calculates a student's merit aggregate per university using official merit formulas, comparing against historical cutoffs.
+  • How it works:** `AdmissionPredictor` component. Inputs: FSc %, Matric %, test score. Uses per-university weight formulas. Shows Good/Moderate/Low chance.
+  • Education system aware:** Yes — accepts IBCC equivalent % for Cambridge students; handles projected marks for Part-I only students.
+  • Connected to:** `useProfile()` hook (can pull marks from profile), entry test data.
+  • Feature: 5. University Comparison Tool
+  • What it does:** Side-by-side comparison of up to 4 universities across all metrics.
+  • How it works:** `UniversityComparison` component. Uses `SearchableSelect` for university picker. Compares fees, ranking, programs, facilities, etc.
+  • Connected to:** Saved list (can compare from saved items).
+  • Feature: 6. Admissions Deadlines Tracker
+  • What it does:** Shows upcoming application deadlines grouped by field and month with countdown timers.
+  • How it works:** `AdmissionsDeadlines` component. Reads deadline data from `universities.js`. Filters by current field selection.
+  • Connected to:** Filter system (field selection), university data.
+  • Feature: 7. Entry Tests Info
+  • What it does:** Displays NET, ECAT, SAT, MDCAT info with university applicability, registration dates, fees, and historical cutoff percentages.
+  • How it works:** `EntryTests` component. Data from `src/data/entryTestsData.js`. Grouped by test type with expandable details.
+  • Education system aware:** No — shows all tests applicable to the student's field.
+  • Connected to:** University data (which unis require which tests).
+  • Feature: 8. Scholarships Panel
+  • What it does:** Lists need-based and merit-based scholarships with eligibility criteria, amounts, and application links.
+  • How it works:** `ScholarshipsPanel` component. Data from `src/data/scholarships.js`. Filterable by type.
+  • Connected to:** Header button trigger.
+  • Feature: 9. Recommendations Section
+  • What it does:** Shows personalized university suggestions based on active filters, sorted by match score.
+  • How it works:** `RecommendationsSection` component. Uses ranking algorithm from `src/utils/ranking.js`.
+  • Feature: Decision 1: Direct Supabase Client (No ORM)
+  • Date:** Feb 21, 2026 | **Phase:** 1
+  • Choice:** Use `@supabase/supabase-js` directly, no Prisma/Drizzle.
+  • Rationale:** Supabase client handles RLS, auth, and real-time natively. An ORM would add unnecessary abstraction for a student profile app.
+  • Feature: Decision 2: RLS with auth.uid() = id
+  • Choice:** Profiles table uses auth user UUID as the primary key (`id = auth.uid()`).
+  • Rationale:** Direct 1:1 mapping between auth users and profiles. No separate user_id column needed.
+  • Feature: Decision 3: Content Script on <all_urls>
+  • Date:** Feb 21, 2026 | **Phase:** 2
+  • Choice:** Content script matches all URLs, with domain check in JS.
+  • Rationale:** Chrome MV3 host_permissions don't control content script injection as expected. JS-side check is more reliable and allows graceful degradation.
+  • Feature: Decision 4: React-Compatible Input Filling
+  • Date:** Feb 21, 2026 | **Phase:** 3
+  • Choice:** Use `Object.getOwnPropertyDescriptor` to get native setter, then dispatch input/change/blur events.
+  • Rationale:** React/Vue intercept `.value =` assignments. Native setter + event dispatch is the only reliable way to trigger their state updates.
+  • Feature: Decision 5: Field Map Caching in Supabase
+  • Choice:** Cache AI-generated field maps in `field_maps` table by domain.
+  • Rationale:** Avoid calling Ollama on every page load. Domain-based caching works because portal forms rarely change structure.
+  • Feature: Decision 6: Local Ollama Instead of Anthropic API
+  • Date:** Feb 21, 2026 | **Phase:** 5-7
+  • Choice:** Use local Ollama with llama3 model instead of Anthropic Claude API.
+  • Rationale:** No API keys needed, no cost, runs entirely on user's machine. Llama3 is sufficient for field mapping (JSON extraction) and SOP drafting.
+  • Feature: Decision 7: 20-Character Edit Requirement for SOP
+  • Date:** Feb 21, 2026 | **Phase:** 5
+  • Choice:** Require at least 20 character edits before allowing AI-drafted SOP insertion.
+  • Rationale:** Prevents students from submitting pure AI-generated essays. Forces personalization.
+  • Feature: Decision 8: Consistent Password Across Portals
+  • Date:** Feb 21, 2026 | **Phase:** 7
+  • Choice:** Generate ONE strong password, store in chrome.storage, reuse across all university portals.
+  • Rationale:** Students apply to 5-15+ universities. Having one memorable, strong password (14+ chars, uppercase, lowercase, number, special char) is more practical than unique passwords per portal. Stored locally in extension, not in Supabase.
+  • Feature: Decision 9: Heuristic Field Detection as Fallback
+  • Choice:** Use heuristic pattern matching (name/id/label/type analysis) as a fallback after AI field mapping.
+  • Rationale:** AI mapping requires sending form HTML to the backend and waiting for Ollama. Heuristics catch common fields (email, phone, CNIC, name) instantly without any API call. AI mapping then handles university-specific fields.
+  • Feature: Decision 10: Page Type Detection for Smart Suggestions
+  • Choice:** Detect login/register/application pages using URL, title, heading, and form structure analysis.
+  • Rationale:** University portals often have separate login and registration pages. Showing "Register first" on login pages saves students from confusion.
+  • Feature: Decision 11: Name Splitting via Virtual Profile Keys
+  • Date:** Feb 22, 2026 | **Phase:** 9
+  • Choice:** Add `first_name`, `last_name`, `middle_name` as virtual profile keys derived from `full_name` using transforms.
+  • Rationale:** Many university forms (SZABIST, LUMS) ask for first/middle/last name separately. Storing these as separate profile fields would mean students fill 4 name fields. Instead, we store one `full_name` and split on-the-fly: first word → first name, last word → last name, middle words → middle name.
+  • Feature: Decision 12: Extension Context Guard with Refresh UI
+  • Date:** Feb 22, 2026 |
+  • Feature: Automated Scraper Sources
+  • Section: Tier 1: Critical Data (Every 20 Days)
+  • Target Fields**: Admission Deadline, Test Date, Test Name
+  • Section: Tier 2: General Data (Bimonthly)
+  • Target Fields**: Fees (`avgFee`), Website URL, Description
+  • Feature: Project Timeline
+  • Feature: Iteration 1: Tinder-Style University Swiping
+  • Date**: January 12, 2026
+  • Section: What Was Built
+  • Section: Step-by-Step
+  • Field/Category (Pre-Engineering, CS, Business, Medical, Others)
+  • Degree Level, Program, Hostel/Campus, City, Campus Type
+  • Touch/mouse drag gestures with color overlays
+  • Save (💚) and Skip (✕) buttons
+  • Match percentage based on filter compatibility
+  • Exact Program Match: 40 pts
+  • Field Category Match: 30 pts
+  • Campus/Hostel Match: 15 pts
+  • City Match: 10 pts, Campus Type: 5 pts
+  • Section: Files Created
+  • `src/app/page.js` — Main page with swipe logic
+  • `src/data/universities.js` — 15 university entries
+  • `src/app/globals.css` — Global styles with dark theme
+  • Feature: Iteration 2: University Rankings & Admission Deadlines
+  • Expandable cards with full details (programs, facilities, fees)
+  • Field-specific ranking badges (#1 in Pre-Eng, #1 in CS, etc.)
+  • Pre-Engineering: NUST → UET → GIKI → PIEAS → NED
+  • CS: FAST → NUST → LUMS → COMSATS → IBA
+  • Business: LUMS → IBA → NUST → COMSATS → Bahria
+  • Real 2026 data from official university websites
+  • Countdown timers showing days remaining
+  • Urgency badges: Red (< 3 days), Orange (< 7), Yellow (< 14)
+  • "Apply Now" links to official admission portals
+  • Field filter to show relevant deadlines only
+  • `src/components/UniversityList/` — Expandable list component
+  • docs/DOCUMENTATION-UPDATE-2026-02-19.md
+  • docs/ENHANCEMENTS.md
+  • docs/HOW_TO_ADD_UNIVERSITY.md
+  • docs/README.md
+  • docs/SCRAPERS.md
+  • docs/SHORTFALLS.md
+  • docs/UNIVERSITY_STATUS.md
+  • docs/WORKFLOWS.md
+  • docs/agent/PHASE_LOGS/phase-1-2026-02-21.md
+
+BUILD JOURNEY:
+  • Iteration 1: Core swipe interface, filters, 15 universities (2026-01-12)
+  • Iteration 2: University list, rankings, deadlines (2026-01-12)
+  • Iteration 3: Theme system, backgrounds, comparison tool (2026-01-23)
+  • Iteration 4: Campus-specific data, 28 universities (2026-01-25)
+  • Iteration 5: Automated CI/CD pipeline, scraper engine, validators (2026-02-19)
+  • Iteration 6: Functional scraper implementations, AST file updates, workflow fixes (2026-02-19)
+  • Iteration 7: Entry tests, scholarships, recommendations, UX enhancements, Supabase (2026-02-20)
+  • Iteration 8: Chrome extension, 3-tier autofill engine, 17 university configs (2026-02-21)
+  • Iteration 9: Apply URL corrections, name splitting, extension detection fixes (2026-02-22)
+  • Iteration Filter: Options (Purpose)
+  • Iteration Field/Category: Pre-Engineering, CS, Business, Medical, Others (Main study area)
+  • Iteration Degree Level: Any, Undergraduate, Associate (Academic level)
+
+RECENT WORK:
+  - docs: rewrite README, FEATURES (32 features), add HOW_TO_ADD_UNIVERSITY and UNIVERSITY_STATUS guides, update schema docs (2026-02-22)
+  - fix: update page.js (2026-02-22)
+  - fix: update extension content script, popup, and profile page styles (2026-02-22)
+  - feat: add useProfile hook, update extension configs and schema docs (2026-02-22)
+  - feat/fix: Chrome extension (Iteration 8) and Apply URL fixes (Iteration 9) - Build Chrome extension (MV3) with Supabase  (2026-02-21)
+  - feat: deterministic autofill engine with 17 per-university selector configs (2026-02-21)
+  - chore: rename project to Ilm Se Urooj and add Urdu translations (2026-02-21)
+  - feat: add nav buttons, smart field detection, consistent passwords, page detection, fix auth & profile (2026-02-21)

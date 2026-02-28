@@ -82,21 +82,39 @@ def _get_deep_repo_context(project_name: str) -> str:
 def _compress_context(raw_context: str) -> str:
     """
     Compress raw deep context into a structured, model-friendly summary.
-    Extracts key info: metadata, features list, tech stack, build phases, commits.
-    This avoids overwhelming small models with raw markdown.
+    Extracts: metadata, tech stack, website features, chrome extension features,
+    architecture notes, build phases, commits. Filters out noise.
     """
     lines = raw_context.split("\n")
     
-    sections = {
-        "metadata": [],
-        "features": [],
-        "tech_stack": [],
-        "architecture": [],
-        "phases": [],
-        "commits": [],
-    }
+    metadata = []
+    website_features = []
+    extension_features = []
+    architecture = []
+    phases = []
+    commits = []
+    tech_deps = []
     
     current_section = None
+    in_extension_block = False
+    
+    # Noise patterns to skip
+    noise = [
+        "section: prerequisites", "section: 1.", "section: 2.", "section: 3.",
+        "section: 4.", "section: 5.", "clone and install", "environment variable",
+        "run the website", "load the extension", "feature: quick start",
+        "feature: decision", "decision 1:", "decision 2:", "decision 3:",
+        "decision 4:", "decision 5:", "decision 6:", "decision 7:",
+        "decision 8:", "decision 9:", "decision 10:", "decision 11:",
+        "decision 12:", "date:**", "choice:**", "rationale:**",
+        "status:**", "education system aware:**", "connected to:**",
+        "section: files created", "section: step-by-step", "section: what was built",
+        "files created", "src/app/", "src/data/", "src/components/",
+        "src/utils/", "`src/", "section: tier 1:", "section: tier 2:",
+        "target fields**", "iteration filter:", "iteration field/",
+        "iteration degree", "docs/", "feature: project timeline",
+        "feature: automated scraper", "feature: iteration",
+    ]
     
     for line in lines:
         stripped = line.strip()
@@ -106,10 +124,11 @@ def _compress_context(raw_context: str) -> str:
         # Section detection
         if stripped.startswith("=== PROJECT:"):
             current_section = "metadata"
-            sections["metadata"].append(stripped)
+            metadata.append(stripped)
             continue
         elif stripped.startswith("=== README"):
             current_section = "features"
+            in_extension_block = False
             continue
         elif stripped.startswith("=== package.json"):
             current_section = "tech_stack"
@@ -119,6 +138,7 @@ def _compress_context(raw_context: str) -> str:
             continue
         elif "FEATURES" in stripped and stripped.startswith("==="):
             current_section = "features"
+            in_extension_block = False
             continue
         elif "PROGRESS" in stripped and stripped.startswith("==="):
             current_section = "phases"
@@ -129,83 +149,140 @@ def _compress_context(raw_context: str) -> str:
         elif "SCHEMA" in stripped and stripped.startswith("==="):
             current_section = "architecture"
             continue
+        elif "DECISION" in stripped.upper() and stripped.startswith("==="):
+            current_section = "skip"
+            continue
+        elif "DATA-SOURCE" in stripped.upper() and stripped.startswith("==="):
+            current_section = "skip"
+            continue
+        elif "DEVELOPMENT-HISTORY" in stripped.upper() and stripped.startswith("==="):
+            current_section = "phases"
+            continue
         elif "COMMITS" in stripped and stripped.startswith("==="):
             current_section = "commits"
             continue
+        elif stripped.startswith("=== Other docs"):
+            current_section = "skip"
+            continue
         elif stripped.startswith("=== "):
-            current_section = "features"  # default bucket
+            current_section = "features"
             continue
         
-        # Extract useful content
+        if current_section == "skip":
+            continue
+        
+        # Check noise
+        lower = stripped.lower()
+        if any(n in lower for n in noise):
+            continue
+        
+        # Metadata
         if current_section == "metadata":
             if any(stripped.startswith(k) for k in ["Language:", "Description:", "URL:", "Last updated:"]):
-                sections["metadata"].append(stripped)
+                metadata.append(stripped)
         
+        # Features — detect Chrome Extension block
         elif current_section == "features":
-            # Extract feature names and descriptions
-            if stripped.startswith("- **") or stripped.startswith("**"):
-                sections["features"].append(stripped)
-            elif stripped.startswith("## ") and "feature" not in stripped.lower() and "what works" not in stripped.lower():
-                sections["features"].append(f"Feature: {stripped[3:]}")
-            elif "status" in stripped.lower() and "✅" in stripped:
-                continue  # skip status lines
-            elif stripped.startswith("- ") and len(stripped) > 15:
-                sections["features"].append(stripped)
-            elif stripped.startswith("### ") and len(stripped) > 5:
-                sections["features"].append(f"Section: {stripped[4:]}")
+            if "chrome extension" in lower and ("section:" in lower or stripped.startswith("###")):
+                in_extension_block = True
+                continue
+            elif ("section: website" in lower or "section: one profile" in lower):
+                in_extension_block = False
+                continue
+            elif stripped.startswith("Section: ") and "supported" not in lower:
+                continue
+            
+            # Skip how-it-works lines and non-feature content
+            if lower.startswith("how it works:**") or lower.startswith("what it does:**"):
+                continue
+            
+            # Extract actual features
+            feature_line = None
+            if stripped.startswith("- **") or (stripped.startswith("**") and "—" in stripped):
+                feature_line = stripped
+            elif stripped.startswith("Feature: ") and "decision" not in lower:
+                name = stripped[9:]
+                if name and len(name) > 5:
+                    feature_line = name
+            
+            if feature_line:
+                target = extension_features if in_extension_block else website_features
+                target.append(feature_line)
         
+        # Tech stack
         elif current_section == "tech_stack":
+            if '"dependencies"' in stripped or '"devDependencies"' in stripped:
+                continue
             if '"' in stripped and ':' in stripped:
-                sections["tech_stack"].append(stripped)
+                try:
+                    key = stripped.split('"')[1]
+                    if key not in ("name", "version", "private", "scripts", "dev", "build", "start", "lint",
+                                   "test-scrapers", "test-file-updates", "dependencies", "devDependencies"):
+                        tech_deps.append(key)
+                except IndexError:
+                    pass
         
+        # Architecture
         elif current_section == "architecture":
-            if stripped.startswith("## ") or stripped.startswith("### "):
-                sections["architecture"].append(stripped.lstrip("#").strip())
-            elif "built with" in stripped.lower() or "next.js" in stripped.lower() or "supabase" in stripped.lower() or "app router" in stripped.lower():
-                sections["architecture"].append(stripped)
-            elif any(kw in stripped.lower() for kw in ["rls", "component", "78 column", "profile", "chrome extension", "3-tier", "autofill"]):
-                sections["architecture"].append(stripped)
+            if any(kw in lower for kw in ["next.js", "supabase", "app router", "component", "rls",
+                                           "ci/cd", "chrome", "autofill", "3-tier", "78 column", "profile"]):
+                architecture.append(stripped)
             elif stripped.startswith("- [x]"):
-                sections["phases"].append(stripped[6:])
+                phases.append(stripped[6:])
         
+        # Phases
         elif current_section == "phases":
             if stripped.startswith("- [x]"):
-                sections["phases"].append(stripped[6:])
-            elif stripped.startswith("| ") and "Iteration" not in stripped and "---" not in stripped and "Date" not in stripped:
+                phases.append(stripped[6:])
+            elif stripped.startswith("| ") and "---" not in stripped:
                 parts = [p.strip() for p in stripped.split("|") if p.strip()]
-                if len(parts) >= 3:
-                    sections["phases"].append(f"Iteration {parts[0]}: {parts[2]} ({parts[1]})")
+                if len(parts) >= 3 and parts[0][0].isdigit():
+                    phases.append(f"Iteration {parts[0]}: {parts[2]} ({parts[1]})")
         
+        # Commits
         elif current_section == "commits":
             if stripped.startswith("- "):
-                sections["commits"].append(stripped)
+                commits.append(stripped)
     
     # Build compressed output
     out = []
     
     # Metadata
-    out.extend(sections["metadata"])
+    out.extend(metadata)
     out.append("")
     
-    # Tech stack (compact)
-    if sections["tech_stack"]:
-        deps = [l.split('"')[1] for l in sections["tech_stack"] if '"' in l and ':' in l and '@' not in l.split('"')[1]]
-        if deps:
-            out.append(f"Tech stack: {', '.join(deps[:15])}")
-            out.append("")
-    
-    # Architecture highlights
-    if sections["architecture"]:
-        out.append("ARCHITECTURE:")
-        for a in sections["architecture"][:10]:
-            out.append(f"  {a}")
+    # Tech stack
+    if tech_deps:
+        out.append(f"Tech stack: {', '.join(tech_deps[:10])}")
         out.append("")
     
-    # Features (the gold)
-    if sections["features"]:
-        out.append("ALL FEATURES:")
+    # Architecture
+    if architecture:
+        out.append("ARCHITECTURE:")
         seen = set()
-        for f in sections["features"]:
+        for a in architecture:
+            clean = a.strip().strip("#").strip()
+            if clean not in seen and len(clean) > 10:
+                seen.add(clean)
+                out.append(f"  • {clean}")
+        out.append("")
+    
+    # Website features
+    if website_features:
+        out.append("WEBSITE FEATURES:")
+        seen = set()
+        for f in website_features:
+            clean = f.strip("- *").strip()
+            if clean and clean not in seen and len(clean) > 10:
+                seen.add(clean)
+                out.append(f"  • {clean}")
+        out.append("")
+    
+    # Chrome Extension features
+    if extension_features:
+        out.append("CHROME EXTENSION FEATURES:")
+        seen = set()
+        for f in extension_features:
             clean = f.strip("- *").strip()
             if clean and clean not in seen and len(clean) > 10:
                 seen.add(clean)
@@ -213,16 +290,19 @@ def _compress_context(raw_context: str) -> str:
         out.append("")
     
     # Build phases
-    if sections["phases"]:
+    if phases:
         out.append("BUILD JOURNEY:")
-        for p in sections["phases"][:12]:
-            out.append(f"  • {p}")
+        seen = set()
+        for p in phases[:12]:
+            if p not in seen:
+                seen.add(p)
+                out.append(f"  • {p}")
         out.append("")
     
     # Commits
-    if sections["commits"]:
+    if commits:
         out.append("RECENT WORK:")
-        for c in sections["commits"][:8]:
+        for c in commits[:6]:
             out.append(f"  {c}")
     
     compressed = "\n".join(out)
