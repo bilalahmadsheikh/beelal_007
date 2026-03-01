@@ -233,3 +233,149 @@ async def bridge_status():
         "tasks": {"pending": pending, "show_overlay": overlay, "total": total},
         "cookie_sites": [r["site"] for r in cookie_sites],
     }
+
+
+# ─── Phase 9: Permission Gate Endpoints ──────────────
+
+import time as _time
+
+# In-memory permission queue (fast — no DB overhead for real-time permission flow)
+pending_permissions: dict = {}  # task_id -> {action data, decision, created_at}
+
+# Server-level Allow All state
+server_allow_all: bool = False
+server_allow_all_expires: float = 0.0
+
+
+class PermissionRequest(BaseModel):
+    task_id: str
+    action_type: str
+    description: str
+    x: Optional[int] = None
+    y: Optional[int] = None
+    text: Optional[str] = None
+    confidence: float = 0.0
+
+
+class PermissionDecision(BaseModel):
+    task_id: str
+    decision: str  # "allow" | "allow_all" | "skip" | "stop" | "edit"
+    edit_data: Optional[str] = None
+
+
+class AllowAllRequest(BaseModel):
+    duration_minutes: int = 30
+
+
+@app.post("/permission/request")
+async def permission_request(data: PermissionRequest):
+    """Queue a permission request for the Chrome Extension overlay."""
+    global server_allow_all, server_allow_all_expires
+
+    # If server-level allow_all is active, auto-approve
+    if server_allow_all and _time.time() < server_allow_all_expires:
+        pending_permissions[data.task_id] = {
+            **data.model_dump(),
+            "decision": "allow",
+            "created_at": _time.time(),
+        }
+        return {"status": "auto_allowed", "task_id": data.task_id}
+
+    pending_permissions[data.task_id] = {
+        **data.model_dump(),
+        "decision": None,
+        "created_at": _time.time(),
+    }
+    print(f"[BRIDGE] Permission queued: {data.task_id} — {data.action_type}: {data.description}")
+    return {"status": "queued", "task_id": data.task_id}
+
+
+@app.get("/permission/pending")
+async def permission_pending():
+    """Return all pending (undecided) permission requests. Extension polls this."""
+    pending = [
+        {
+            "task_id": tid,
+            "action_type": info.get("action_type", "unknown"),
+            "description": info.get("description", ""),
+            "x": info.get("x"),
+            "y": info.get("y"),
+            "text": info.get("text"),
+            "confidence": info.get("confidence", 0),
+            "created_at": info.get("created_at", 0),
+        }
+        for tid, info in pending_permissions.items()
+        if info.get("decision") is None
+    ]
+    return pending
+
+
+@app.post("/permission/result")
+async def permission_result_set(data: PermissionDecision):
+    """Receive a decision from the Chrome Extension overlay."""
+    global server_allow_all, server_allow_all_expires
+
+    if data.task_id not in pending_permissions:
+        raise HTTPException(status_code=404, detail=f"Permission {data.task_id} not found")
+
+    pending_permissions[data.task_id]["decision"] = data.decision
+    if data.edit_data:
+        pending_permissions[data.task_id]["edit_data"] = data.edit_data
+
+    # If user chose "allow_all", activate server-level auto-approve
+    if data.decision == "allow_all":
+        server_allow_all = True
+        server_allow_all_expires = _time.time() + (30 * 60)  # 30 minutes
+        print(f"[BRIDGE] Allow All activated for 30 minutes")
+
+    print(f"[BRIDGE] Permission {data.task_id}: {data.decision}")
+    return {"status": "received", "task_id": data.task_id, "decision": data.decision}
+
+
+@app.get("/permission/result/{task_id}")
+async def permission_result_get(task_id: str):
+    """Poll for decision on a specific permission request."""
+    if task_id not in pending_permissions:
+        return {"decision": "not_found"}
+
+    decision = pending_permissions[task_id].get("decision")
+    if decision is None:
+        return {"decision": "pending"}
+
+    result = {"decision": decision}
+    if "edit_data" in pending_permissions[task_id]:
+        result["edit_data"] = pending_permissions[task_id]["edit_data"]
+    return result
+
+
+@app.post("/permission/set_allow_all")
+async def set_allow_all(data: AllowAllRequest):
+    """Enable auto-approve for N minutes."""
+    global server_allow_all, server_allow_all_expires
+
+    server_allow_all = True
+    server_allow_all_expires = _time.time() + (data.duration_minutes * 60)
+
+    print(f"[BRIDGE] Allow All set for {data.duration_minutes} minutes")
+    return {
+        "status": "ok",
+        "expires_at": server_allow_all_expires,
+        "duration_minutes": data.duration_minutes,
+    }
+
+
+@app.get("/permission/allow_all_status")
+async def allow_all_status():
+    """Get current Allow All status."""
+    global server_allow_all, server_allow_all_expires
+
+    if server_allow_all and _time.time() >= server_allow_all_expires:
+        server_allow_all = False  # Expired
+
+    remaining = max(0, int(server_allow_all_expires - _time.time())) if server_allow_all else 0
+
+    return {
+        "active": server_allow_all,
+        "expires_at": server_allow_all_expires if server_allow_all else 0,
+        "time_remaining_seconds": remaining,
+    }

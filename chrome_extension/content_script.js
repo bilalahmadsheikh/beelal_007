@@ -350,5 +350,211 @@
     });
     urlObserver.observe(document.body, { childList: true, subtree: true });
 
-    console.log('[BilalAgent] Content script loaded');
+    // ─── Feature 4: Permission Overlay (Phase 9) ──────
+
+    const BRIDGE_URL = 'http://localhost:8000';
+    let activePermissionOverlay = null;
+    let permissionPollInterval = null;
+    let allowAllBadge = null;
+
+    const ACTION_COLORS = {
+        click: '#FF6B6B',
+        type: '#4ECDC4',
+        scroll: '#45B7D1',
+        extract: '#96CEB4',
+        done: '#A8E6CF',
+        ask: '#FFEAA7',
+    };
+
+    function createPermissionOverlay(request) {
+        // Remove existing
+        if (activePermissionOverlay) {
+            activePermissionOverlay.remove();
+            activePermissionOverlay = null;
+        }
+
+        const color = ACTION_COLORS[request.action_type] || ACTION_COLORS.ask;
+        const confidence = Math.round((request.confidence || 0) * 100);
+
+        const overlay = document.createElement('div');
+        overlay.id = 'bilal-permission-overlay';
+        overlay.innerHTML = `
+      <div style="
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 999999;
+        background: rgba(0,0,0,0.92);
+        border-top: 3px solid ${color};
+        padding: 12px 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        animation: permSlideUp 0.25s ease;
+      ">
+        <style>
+          @keyframes permSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+          @keyframes permPulse { 0%, 100% { opacity: 0.7; transform: scale(1); } 50% { opacity: 1; transform: scale(1.5); } }
+          .perm-btn { padding: 8px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; font-family: inherit; }
+          .perm-btn:hover { transform: scale(1.05); filter: brightness(1.1); }
+        </style>
+
+        <!-- Left: Info -->
+        <div style="flex: 1; min-width: 0;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+            <span style="
+              display: inline-block;
+              padding: 3px 10px;
+              background: ${color};
+              color: #000;
+              border-radius: 12px;
+              font-size: 11px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            ">${request.action_type}</span>
+            <span style="color: #aaa; font-size: 11px;">${request.task_id}</span>
+          </div>
+          <p style="margin: 0; color: #fff; font-size: 14px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${request.description || 'No description'}
+          </p>
+          <div style="margin-top: 6px; display: flex; align-items: center; gap: 8px;">
+            <div style="flex: 1; max-width: 200px; background: #333; height: 4px; border-radius: 2px; overflow: hidden;">
+              <div style="width: ${confidence}%; height: 100%; background: ${color}; border-radius: 2px;"></div>
+            </div>
+            <span style="color: #888; font-size: 11px;">${confidence}% confidence</span>
+            ${request.x != null ? `<span style="color: #666; font-size: 11px;">@ (${request.x}, ${request.y})</span>` : ''}
+          </div>
+        </div>
+
+        <!-- Right: Buttons -->
+        <div style="display: flex; gap: 8px; flex-shrink: 0;">
+          <button class="perm-btn" data-decision="allow" style="background: #10b981; color: #fff;">Allow Once</button>
+          <button class="perm-btn" data-decision="allow_all" style="background: #f59e0b; color: #000; font-weight: 700;">Allow All 30min</button>
+          <button class="perm-btn" data-decision="skip" style="background: #6b7280; color: #fff;">Skip</button>
+          <button class="perm-btn" data-decision="stop" style="background: #ef4444; color: #fff;">Stop</button>
+          <button class="perm-btn" data-decision="edit" style="background: #3b82f6; color: #fff;">Edit</button>
+        </div>
+      </div>
+    `;
+
+        document.body.appendChild(overlay);
+        activePermissionOverlay = overlay;
+
+        // Button click handlers
+        overlay.querySelectorAll('.perm-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const decision = btn.dataset.decision;
+                try {
+                    await fetch(`${BRIDGE_URL}/permission/result`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            task_id: request.task_id,
+                            decision: decision
+                        })
+                    });
+                } catch (e) {
+                    console.error('[BilalAgent] Failed to send permission decision:', e);
+                }
+                overlay.remove();
+                activePermissionOverlay = null;
+            });
+        });
+
+        // Crosshair indicator at target coordinates
+        if (request.x != null && request.y != null) {
+            const crosshair = document.createElement('div');
+            crosshair.style.cssText = `
+                position: fixed;
+                left: ${request.x - 12}px;
+                top: ${request.y - 12}px;
+                width: 24px;
+                height: 24px;
+                border: 2px solid ${color};
+                border-radius: 50%;
+                pointer-events: none;
+                z-index: 999998;
+                animation: permPulse 1s ease infinite;
+                box-shadow: 0 0 10px ${color}80;
+            `;
+            document.body.appendChild(crosshair);
+            setTimeout(() => crosshair.remove(), 3000);
+        }
+    }
+
+    // Permission polling loop
+    function startPermissionPolling() {
+        if (permissionPollInterval) return;
+
+        permissionPollInterval = setInterval(async () => {
+            try {
+                // Check for pending permissions
+                const resp = await fetch(`${BRIDGE_URL}/permission/pending`);
+                if (resp.ok) {
+                    const pending = await resp.json();
+                    if (pending.length > 0 && !activePermissionOverlay) {
+                        createPermissionOverlay(pending[0]);
+                    }
+                }
+
+                // Check Allow All status
+                const aaResp = await fetch(`${BRIDGE_URL}/permission/allow_all_status`);
+                if (aaResp.ok) {
+                    const aaData = await aaResp.json();
+                    updateAllowAllBadge(aaData);
+                }
+            } catch (e) {
+                // Bridge offline — ignore silently
+            }
+        }, 1000);
+    }
+
+    function updateAllowAllBadge(data) {
+        if (data.active) {
+            const mins = Math.floor(data.time_remaining_seconds / 60);
+            const secs = data.time_remaining_seconds % 60;
+            if (!allowAllBadge) {
+                allowAllBadge = document.createElement('div');
+                allowAllBadge.id = 'bilal-allow-all-badge';
+                allowAllBadge.style.cssText = `
+                    position: fixed;
+                    top: 8px;
+                    right: 8px;
+                    z-index: 999998;
+                    background: #ef4444;
+                    color: #fff;
+                    padding: 6px 14px;
+                    border-radius: 20px;
+                    font-family: -apple-system, sans-serif;
+                    font-size: 12px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    box-shadow: 0 2px 10px rgba(239,68,68,0.4);
+                `;
+                allowAllBadge.title = 'Click to revoke Allow All';
+                allowAllBadge.addEventListener('click', async () => {
+                    try {
+                        await fetch(`${BRIDGE_URL}/permission/set_allow_all`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ duration_minutes: 0 })
+                        });
+                        if (allowAllBadge) { allowAllBadge.remove(); allowAllBadge = null; }
+                    } catch (e) { }
+                });
+                document.body.appendChild(allowAllBadge);
+            }
+            allowAllBadge.textContent = `AUTO: ${mins}m ${secs}s`;
+        } else {
+            if (allowAllBadge) { allowAllBadge.remove(); allowAllBadge = null; }
+        }
+    }
+
+    // Start permission polling alongside existing features
+    startPermissionPolling();
+
+    console.log('[BilalAgent] Content script loaded (with Permission Gate)');
 })();

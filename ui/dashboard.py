@@ -165,6 +165,68 @@ class DashboardApp:
                                    font=("Consolas", 10))
         self.ram_label.pack(anchor="w")
 
+        # ─── UI-TARS Vision Agent (Phase 9) ──────
+        uitars_frame = tk.LabelFrame(tab, text="  UI-TARS Vision Agent  ", bg=BG_CARD, fg="#FF6B6B",
+                                      font=("Segoe UI", 11, "bold"), padx=16, pady=8,
+                                      bd=1, relief="groove", highlightbackground=BG_INPUT)
+        uitars_frame.pack(fill=tk.X, padx=12, pady=6)
+
+        uitars_row = tk.Frame(uitars_frame, bg=BG_CARD)
+        uitars_row.pack(fill=tk.X)
+
+        self.uitars_status = tk.Label(uitars_row, text="● Stopped", bg=BG_CARD, fg=RED,
+                                       font=("Segoe UI", 10, "bold"))
+        self.uitars_status.pack(side=tk.LEFT, padx=(0, 16))
+
+        tk.Button(uitars_row, text="Start 2B", bg="#4ECDC4", fg="black",
+                  font=("Segoe UI", 9, "bold"), bd=0, padx=10, pady=3,
+                  command=lambda: self._uitars_action("start", "2b")).pack(side=tk.LEFT, padx=2)
+        tk.Button(uitars_row, text="Start 7B", bg="#FF6B6B", fg="white",
+                  font=("Segoe UI", 9, "bold"), bd=0, padx=10, pady=3,
+                  command=lambda: self._uitars_action("start", "7b")).pack(side=tk.LEFT, padx=2)
+        tk.Button(uitars_row, text="Stop", bg=BG_INPUT, fg=FG,
+                  font=("Segoe UI", 9), bd=0, padx=10, pady=3,
+                  command=lambda: self._uitars_action("stop")).pack(side=tk.LEFT, padx=2)
+
+        self.uitars_last_action = tk.Label(uitars_frame, text="Last action: —",
+                                            bg=BG_CARD, fg=FG_DIM, font=("Segoe UI", 9))
+        self.uitars_last_action.pack(anchor="w", pady=(4, 0))
+
+        # ─── Permission Controls (Phase 9) ──────
+        perm_frame = tk.LabelFrame(tab, text="  Permission Controls  ", bg=BG_CARD, fg=YELLOW,
+                                    font=("Segoe UI", 11, "bold"), padx=16, pady=8,
+                                    bd=1, relief="groove", highlightbackground=BG_INPUT)
+        perm_frame.pack(fill=tk.X, padx=12, pady=6)
+
+        perm_row = tk.Frame(perm_frame, bg=BG_CARD)
+        perm_row.pack(fill=tk.X)
+
+        self.perm_status = tk.Label(perm_row, text="Manual — asking each action", bg=BG_CARD, fg=GREEN,
+                                     font=("Segoe UI", 10, "bold"))
+        self.perm_status.pack(side=tk.LEFT, padx=(0, 16))
+
+        tk.Button(perm_row, text="Allow All 30min", bg=YELLOW, fg="black",
+                  font=("Segoe UI", 9, "bold"), bd=0, padx=10, pady=3,
+                  command=lambda: self._set_allow_all(30)).pack(side=tk.LEFT, padx=2)
+        tk.Button(perm_row, text="Allow All 2hr", bg="#f59e0b", fg="black",
+                  font=("Segoe UI", 9), bd=0, padx=10, pady=3,
+                  command=lambda: self._set_allow_all(120)).pack(side=tk.LEFT, padx=2)
+        tk.Button(perm_row, text="Revoke", bg=RED, fg="white",
+                  font=("Segoe UI", 9, "bold"), bd=0, padx=10, pady=3,
+                  command=lambda: self._set_allow_all(0)).pack(side=tk.LEFT, padx=2)
+
+        skip_row = tk.Frame(perm_frame, bg=BG_CARD)
+        skip_row.pack(fill=tk.X, pady=(6, 0))
+
+        self.skip_scroll_var = tk.BooleanVar(value=False)
+        self.skip_extract_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(skip_row, text="Skip scroll actions", variable=self.skip_scroll_var,
+                        bg=BG_CARD, fg=FG, selectcolor=BG_INPUT,
+                        font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(0, 16))
+        tk.Checkbutton(skip_row, text="Skip extract actions", variable=self.skip_extract_var,
+                        bg=BG_CARD, fg=FG, selectcolor=BG_INPUT,
+                        font=("Segoe UI", 9)).pack(side=tk.LEFT)
+
         # Stats + Actions row
         row = tk.Frame(tab, bg=BG)
         row.pack(fill=tk.X, padx=12, pady=6)
@@ -290,6 +352,47 @@ class DashboardApp:
 
         # Schedule next refresh (30s)
         self.root.after(30000, self._refresh_overview)
+
+    def _uitars_action(self, action, model=None):
+        """Start/stop UI-TARS server from dashboard."""
+        def run():
+            try:
+                from tools.uitars_server import get_server
+                server = get_server()
+                if action == "start" and model:
+                    self.root.after(0, lambda: self.uitars_status.config(text="● Starting...", fg=YELLOW))
+                    ok = server.start(model)
+                    if ok:
+                        self.root.after(0, lambda: self.uitars_status.config(
+                            text=f"● Running ({model.upper()})", fg=GREEN))
+                    else:
+                        self.root.after(0, lambda: self.uitars_status.config(text="● Failed", fg=RED))
+                elif action == "stop":
+                    server.stop()
+                    self.root.after(0, lambda: self.uitars_status.config(text="● Stopped", fg=RED))
+            except Exception as e:
+                self.root.after(0, lambda: self.uitars_status.config(text=f"● Error", fg=RED))
+        threading.Thread(target=run, daemon=True).start()
+
+    def _set_allow_all(self, minutes):
+        """Set/revoke Allow All mode via bridge endpoint."""
+        def run():
+            try:
+                import requests as _req
+                if minutes > 0:
+                    _req.post(f"http://localhost:8000/permission/set_allow_all",
+                              json={"duration_minutes": minutes}, timeout=3)
+                    self.root.after(0, lambda: self.perm_status.config(
+                        text=f"AUTO MODE — {minutes}min remaining", fg=RED))
+                else:
+                    _req.post(f"http://localhost:8000/permission/set_allow_all",
+                              json={"duration_minutes": 0}, timeout=3)
+                    self.root.after(0, lambda: self.perm_status.config(
+                        text="Manual — asking each action", fg=GREEN))
+            except Exception:
+                self.root.after(0, lambda: self.perm_status.config(
+                    text="Bridge offline", fg=RED))
+        threading.Thread(target=run, daemon=True).start()
 
     def _review_pending(self):
         messagebox.showinfo("Pending Approvals",
