@@ -62,8 +62,8 @@ PURPLE = "#8b5cf6"
 class DashboardApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("BilalAgent v2.0 — Dashboard")
-        self.root.geometry("960x700")
+        self.root.title("BilalAgent v3.0 — Dashboard")
+        self.root.geometry("1060x750")
         self.root.configure(bg=BG)
         self.root.minsize(800, 600)
 
@@ -80,7 +80,7 @@ class DashboardApp:
         header = tk.Frame(main, bg=ACCENT, height=48)
         header.pack(fill=tk.X)
         header.pack_propagate(False)
-        tk.Label(header, text="⚡ BilalAgent v2.0", font=("Segoe UI", 14, "bold"),
+        tk.Label(header, text="⚡ BilalAgent v3.0", font=("Segoe UI", 14, "bold"),
                  bg=ACCENT, fg="white").pack(side=tk.LEFT, padx=16)
 
         self.mode_label = tk.Label(header, text="Mode: Local", font=("Segoe UI", 10),
@@ -91,11 +91,17 @@ class DashboardApp:
         self.notebook = ttk.Notebook(main, style="Dark.TNotebook")
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
 
+        self._build_command_tab()
         self._build_overview_tab()
         self._build_jobs_tab()
         self._build_posts_tab()
         self._build_gigs_tab()
         self._build_settings_tab()
+
+        # Command history
+        self._cmd_history = []
+        self._cmd_history_idx = -1
+        self._agent_running = False
 
         # Start RAM monitor
         self._update_ram()
@@ -677,6 +683,169 @@ class DashboardApp:
             messagebox.showinfo("Saved", "Settings saved successfully!")
         except yaml.YAMLError as e:
             messagebox.showerror("YAML Error", f"Invalid YAML:\n{e}")
+
+
+    # ─── Command Tab ─────────────────────────────────────
+
+    def _build_command_tab(self):
+        tab = tk.Frame(self.notebook, bg=BG)
+        self.notebook.add(tab, text="  ⚡ Command  ")
+
+        # Top label
+        top_bar = tk.Frame(tab, bg=BG_CARD)
+        top_bar.pack(fill=tk.X, padx=12, pady=(12, 4))
+        tk.Label(top_bar, text="Agent Command Prompt",
+                 bg=BG_CARD, fg=FG, font=("Segoe UI", 13, "bold")).pack(side=tk.LEFT, padx=12, pady=8)
+        self.cmd_status_label = tk.Label(top_bar, text="● Ready", bg=BG_CARD, fg=GREEN,
+                                          font=("Segoe UI", 10, "bold"))
+        self.cmd_status_label.pack(side=tk.RIGHT, padx=12)
+
+        # Output area
+        self.cmd_output = scrolledtext.ScrolledText(tab, bg="#0c1222", fg="#a5f3fc",
+                                                     font=("Consolas", 10),
+                                                     insertbackground=FG, bd=0,
+                                                     wrap=tk.WORD, state=tk.DISABLED)
+        self.cmd_output.pack(fill=tk.BOTH, expand=True, padx=12, pady=4)
+
+        # Tag configs for colored output
+        self.cmd_output.tag_configure("header", foreground="#60a5fa", font=("Consolas", 10, "bold"))
+        self.cmd_output.tag_configure("result", foreground="#34d399")
+        self.cmd_output.tag_configure("error", foreground="#f87171")
+        self.cmd_output.tag_configure("info", foreground="#94a3b8")
+
+        # Input frame
+        input_frame = tk.Frame(tab, bg=BG_CARD)
+        input_frame.pack(fill=tk.X, padx=12, pady=(4, 12))
+
+        # Prompt indicator
+        tk.Label(input_frame, text="❯", bg=BG_CARD, fg=ACCENT,
+                 font=("Consolas", 16, "bold")).pack(side=tk.LEFT, padx=(12, 4))
+
+        # Input field
+        self.cmd_entry = tk.Entry(input_frame, bg=BG_INPUT, fg=FG,
+                                  font=("Consolas", 12), bd=0,
+                                  insertbackground=FG, relief=tk.FLAT)
+        self.cmd_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=4, ipady=8)
+        self.cmd_entry.bind("<Return>", lambda e: self._run_agent_command())
+        self.cmd_entry.bind("<Up>", lambda e: self._cmd_history_nav(-1))
+        self.cmd_entry.bind("<Down>", lambda e: self._cmd_history_nav(1))
+        self.cmd_entry.focus_set()
+
+        # Send button
+        self.cmd_send_btn = tk.Button(input_frame, text="Send ▶", bg=ACCENT, fg="white",
+                  font=("Segoe UI", 10, "bold"), bd=0, padx=16, pady=6,
+                  command=self._run_agent_command, cursor="hand2")
+        self.cmd_send_btn.pack(side=tk.LEFT, padx=(4, 4))
+
+        # Clear button
+        tk.Button(input_frame, text="Clear", bg=BG_INPUT, fg=FG_DIM,
+                  font=("Segoe UI", 9), bd=0, padx=10, pady=6,
+                  command=self._clear_output).pack(side=tk.LEFT, padx=(0, 12))
+
+        # Welcome message
+        self._append_output("BilalAgent v3.0 — Ready\n", "header")
+        self._append_output("Type any command and press Enter or click Send.\n", "info")
+        self._append_output("Examples:\n", "info")
+        self._append_output('  "brand check"                — GitHub activity report\n', "info")
+        self._append_output('  "write linkedin post about basepy"  — Generate post\n', "info")
+        self._append_output('  "search python developer jobs"      — Multi-site search\n', "info")
+        self._append_output('  "generate all gigs"           — Create 5 Fiverr gigs\n', "info")
+        self._append_output('  "what are my strongest skills" — NLP analysis\n', "info")
+        self._append_output("─" * 60 + "\n", "info")
+
+    def _append_output(self, text, tag=None):
+        """Thread-safe append to output panel."""
+        def _do():
+            self.cmd_output.config(state=tk.NORMAL)
+            if tag:
+                self.cmd_output.insert(tk.END, text, tag)
+            else:
+                self.cmd_output.insert(tk.END, text)
+            self.cmd_output.see(tk.END)
+            self.cmd_output.config(state=tk.DISABLED)
+        self.root.after(0, _do)
+
+    def _clear_output(self):
+        self.cmd_output.config(state=tk.NORMAL)
+        self.cmd_output.delete("1.0", tk.END)
+        self.cmd_output.config(state=tk.DISABLED)
+
+    def _cmd_history_nav(self, direction):
+        """Navigate command history with Up/Down arrows."""
+        if not self._cmd_history:
+            return
+        self._cmd_history_idx = max(0, min(
+            len(self._cmd_history) - 1,
+            self._cmd_history_idx + direction
+        ))
+        self.cmd_entry.delete(0, tk.END)
+        self.cmd_entry.insert(0, self._cmd_history[self._cmd_history_idx])
+
+    def _run_agent_command(self):
+        """Run user command through agent.handle_command() in a background thread."""
+        command = self.cmd_entry.get().strip()
+        if not command or self._agent_running:
+            return
+
+        # Save to history
+        self._cmd_history.append(command)
+        self._cmd_history_idx = len(self._cmd_history)
+
+        # Clear input
+        self.cmd_entry.delete(0, tk.END)
+
+        # Update UI
+        self._agent_running = True
+        self.root.after(0, lambda: self.cmd_status_label.config(text="● Running...", fg=YELLOW))
+        self.root.after(0, lambda: self.cmd_send_btn.config(state=tk.DISABLED, bg=BG_INPUT))
+        self._append_output(f"\n❯ {command}\n", "header")
+
+        def worker():
+            import io
+            import contextlib
+
+            # Capture stdout
+            capture = io.StringIO()
+            try:
+                # Import agent components
+                from memory.db import init_db
+                init_db()
+
+                # Load profile
+                profile = {}
+                try:
+                    profile_path = os.path.join(PROJECT_ROOT, "config", "profile.yaml")
+                    with open(profile_path, "r", encoding="utf-8") as f:
+                        profile = yaml.safe_load(f) or {}
+                except Exception:
+                    pass
+
+                # Redirect stdout to capture
+                with contextlib.redirect_stdout(capture):
+                    from agent import handle_command
+                    result = handle_command(command, profile)
+
+                # Get captured output
+                output = capture.getvalue()
+                if output:
+                    self._append_output(output, "result")
+
+                # If result is a dict, show it too
+                if result and isinstance(result, dict):
+                    self._append_output(f"\n{json.dumps(result, indent=2)}\n", "result")
+
+            except Exception as e:
+                self._append_output(f"\n✗ Error: {e}\n", "error")
+                import traceback
+                self._append_output(traceback.format_exc(), "error")
+
+            finally:
+                self._append_output("─" * 60 + "\n", "info")
+                self._agent_running = False
+                self.root.after(0, lambda: self.cmd_status_label.config(text="● Ready", fg=GREEN))
+                self.root.after(0, lambda: self.cmd_send_btn.config(state=tk.NORMAL, bg=ACCENT))
+
+        threading.Thread(target=worker, daemon=True).start()
 
 
 def launch_dashboard():
