@@ -1,8 +1,8 @@
-# Architecture — BilalAgent v2.0
+# Architecture — BilalAgent v3.0
 
 ## Overview
 
-BilalAgent is a personal AI desktop agent that runs 100% locally with no paid APIs. It uses multiple Ollama models with **tiered keep_alive caching** and dynamic RAM management to operate on a resource-constrained machine (8.5GB RAM). **Phases 0-6 complete.**
+BilalAgent is a personal AI desktop agent that runs 100% locally with no paid APIs. It uses multiple Ollama models with **tiered keep_alive caching**, a **UI-TARS vision model** via llama.cpp, and a **permission-gated browser copilot** for full automation. **Phases 0-10 complete.**
 
 ## System Diagram
 
@@ -12,18 +12,23 @@ BilalAgent is a personal AI desktop agent that runs 100% locally with no paid AP
 │              (Manifest V3 / Overlay)             │
 │   Context Snap • Approval • MutationObserver     │
 │   Cookie Sync • AI Response Capture (Hybrid)     │
+│   ★ Permission Overlay (5 buttons, crosshair)    │
+│   ★ Allow All Badge (click to revoke)            │
 └────────────────────┬────────────────────────────┘
                      │ HTTP (localhost:8000)
 ┌────────────────────▼────────────────────────────┐
 │               FastAPI Bridge                     │
 │  /command /approve /status /ai_response          │
 │  /context_snap /cookies /register_task           │
+│  ★ /permission/request /pending /result          │
+│  ★ /permission/set_allow_all /allow_all_status   │
 └────────────────────┬────────────────────────────┘
                      │
 ┌────────────────────▼────────────────────────────┐
 │          agent.py — Main Entry Point             │
 │   Startup: DB init → Profile → GitHub Sync       │
 │   CLI: python agent.py "command"                 │
+│   ★ Mode 2 Check → Browser Copilot triggers      │
 │   Routing: brand → freelance → content → jobs    │
 └────────────────────┬────────────────────────────┘
                      │
@@ -56,7 +61,50 @@ BilalAgent is a personal AI desktop agent that runs 100% locally with no paid AP
    │       │  Freelance Pipeline (Phase 5)           │
    │       │ Upwork RSS → Monitor → Gig Gen → Fiverr │
    │       └────────────────────────────────────────┘
+   │
    ▼
+┌────────────────────────────────────────────────────┐
+│  ★ UI-TARS Vision Layer (Phase 8-10)               │
+│                                                    │
+│  llama-server.exe (port 8081) ─── GGUF models      │
+│    ├─ UI-TARS 2B (fast, ~3GB RAM)                  │
+│    └─ UI-TARS 7B (accurate, ~5GB RAM)              │
+│                                                    │
+│  UITARSServer ─→ capture_screen() ─→ ask_uitars()  │
+│       ↓              ↓                    ↓        │
+│  ScreenMonitor    mss library      OpenAI API      │
+│  (2s interval)    (base64 PNG)     (llama.cpp)     │
+│       ↓                                  ↓        │
+│  PermissionGate ←── Bridge Endpoint ←── Extension  │
+│  (Allow/Skip/Stop/Edit/Allow All)       Overlay    │
+│       ↓                                           │
+│  execute_action() ─→ pyautogui (click/type/scroll) │
+└────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────┐
+│  ★ Browser Copilot (Phase 10)                      │
+│                                                    │
+│  Trigger: "apply to this" / "copilot" / "use       │
+│           claude for" (Mode 2 in agent.py)         │
+│                                                    │
+│  extract_page_context()                            │
+│    ├─ Strategy A: CDP (LinkedIn/Upwork/Fiverr)     │
+│    ├─ Strategy B: UI-TARS vision (screen read)     │
+│    └─ Strategy C: Playwright (page source)         │
+│         ↓                                          │
+│  draft_llm_prompt() ─→ Cover letter / Proposal /   │
+│                        LinkedIn post / Summary      │
+│         ↓                                          │
+│  open_and_fill_llm(target="claude"|"chatgpt")      │
+│    ├─ Permission: Open browser        [Allow Once] │
+│    ├─ Permission: Autofill prompt     [Allow Once] │
+│    ├─ Permission: Click Send          [Allow Once] │
+│    ├─ Wait for response (MutationObserver/polling)  │
+│    └─ Permission: Use response        [Allow Once] │
+│         ↓                                          │
+│  Save to memory/content_output/                    │
+└────────────────────────────────────────────────────┘
+
 ┌────────────────────────────────────────┐
 │       Connectors & Memory              │
 │  GitHub REST API (24h cache)           │
@@ -73,169 +121,151 @@ BilalAgent is a personal AI desktop agent that runs 100% locally with no paid AP
 
 ## Model Stack
 
-| Tier | Model | Ollama Name | RAM | Role | keep_alive |
+| Tier | Model | Runtime | RAM | Role | keep_alive |
 |---|---|---|---|---|---|
-| Router | Gemma 3 1B | `gemma3:1b` | ~1 GB | Routes commands to agents | `5m` (always warm) |
-| Content | Gemma 3 4B | `gemma3:4b` | ~3.3 GB | LinkedIn posts, cover letters, gigs, weekly posts | `30s` + explicit unload |
-| NLP | Phi-4 Mini | `phi4-mini` | ~3 GB | Scoring, analysis | `30s` |
-| Fallback | Gemma 2 9B | `gemma2:9b` | ~6 GB | Reliable alternative | `30s` |
+| Router | Gemma 3 1B | Ollama | ~1 GB | Routes commands to agents | `5m` (always warm) |
+| Content | Gemma 3 4B | Ollama | ~3.3 GB | LinkedIn posts, cover letters, gigs | `30s` + unload |
+| NLP | Phi-4 Mini | Ollama | ~3 GB | Scoring, analysis | `30s` |
+| Fallback | Gemma 2 9B | Ollama | ~6 GB | Reliable alternative | `30s` |
+| Vision 2B | UI-TARS 2B | llama.cpp | ~3 GB | Fast screen reading | On-demand |
+| Vision 7B | UI-TARS 7B | llama.cpp | ~5 GB | Accurate screen reading | On-demand |
 
 ## RAM Management Strategy
 
 **Tiered keep_alive** — not `keep_alive:0` (which wastes time reloading):
-- **Orchestrator**: `keep_alive=5m` — always warm for fast routing (1s TTFT on cache hit)
+- **Orchestrator**: `keep_alive=5m` — always warm for fast routing
 - **Specialists**: `keep_alive=30s` — short window for follow-up calls
 - **After generation**: explicit `force_unload()` to reclaim RAM immediately
+- **UI-TARS**: CPU-only (`--ngl 0`), started/stopped on demand to avoid RAM contention
 
-**Load/Unload flow:**
-```
-1. Orchestrator routes command          (gemma3:1b stays loaded)
-2. Content agent unloads orchestrator   (force_unload gemma3:1b)
-3. Gemma 3 4B loads + generates         (safe_run with RAM check)
-4. Content agent unloads specialist     (force_unload gemma3:4b)
-5. Orchestrator reloads naturally on next command
-```
-
-## Dynamic Profile System
-
-All prompts read from `config/profile.yaml` at runtime:
-- **content_agent.py** → `_build_system_prompt()` injects name, degree, GitHub, location
-- **content_tools.py** → `_load_profile()` injects name for authorship and GitHub URLs
-- No hardcoded profile data in any prompt template
-
-## Content Generation Pipeline
+## Permission Gate System (Phase 9)
 
 ```
-User Input: "write a linkedin post about IlmSeUrooj covering chrome extension"
+Action → PermissionGate.request()
   │
-  ├─ Regex extracts project_name: "ilmseurooj" (first word after about/for/on)
-  ├─ Full user input passed as user_request to all generators
+  ├─ Allow All active? → auto-approve
+  ├─ Action type in skip_types? → auto-skip
   │
-  ├─ _find_repo_name("ilmseurooj") → fuzzy match → "IlmSeUrooj"
-  ├─ _get_deep_repo_context("IlmSeUrooj")
-  │   ├─ README.md (full)
-  │   ├─ docs/ folder (all .md files)
-  │   ├─ CHANGELOG.md
-  │   ├─ package.json (tech stack)
-  │   └─ Recent commits (30)
-  │
-  ├─ _compress_context() → 39KB → 5KB
-  │
-  ├─ Prompt = repo_context + type_instructions + USER'S REQUEST
-  └─ → content_agent.generate() → Gemma 3 4B → post
+  └─ POST /permission/request → Bridge queues request
+       │
+       Chrome Extension polls /permission/pending
+       │
+       Permission Overlay displayed:
+       ┌─────────────────────────────────────────┐
+       │ ● CLICK  Click the Apply button         │
+       │ Confidence: ████████░░ 85%              │
+       │ Target: (500, 300)                      │
+       │                                         │
+       │ [Allow Once] [Allow All 30min] [Skip]   │
+       │ [Stop] [Edit]                           │
+       └─────────────────────────────────────────┘
+       │
+       POST /permission/result → decision stored
+       │
+       PermissionGate polls /permission/result/{task_id}
+       │
+       Returns: "allow" | "skip" | "stop" | "edit"
 ```
 
-## LinkedIn Brand Engine (Phase 6)
+## Browser Copilot (Phase 10)
 
-```
-"generate weekly posts"
-  │
-  ├─ GitHubActivityMonitor.get_content_ideas()
-  │   ├─ check_new_activity() — repos, commits, stars, READMEs
-  │   └─ Generate 3 ideas: project_showcase, learning_update, opinion
-  │
-  ├─ For each idea (3 posts):
-  │   ├─ Mode "local": content_agent.generate() → gemma3:4b
-  │   ├─ Mode "hybrid": local draft → Claude web UI polish
-  │   │   ├─ Playwright opens claude.ai with extension loaded
-  │   │   ├─ Types: "Refine this LinkedIn post..."
-  │   │   ├─ MutationObserver captures Claude's response
-  │   │   └─ ai_response → bridge → returned as polished text
-  │   └─ Mode "web_copilot": full generation via Claude
-  │
-  ├─ Save to memory/post_drafts/{date}_{type}.txt
-  ├─ Log to SQLite content_log (status="pending_approval")
-  └─ Log to linkedin_posts.xlsx
-```
+**Mode 2 Triggers** (detected in `agent.py` before orchestrator routing):
+- "apply to this", "help with this page", "summarize this"
+- "write proposal for this", "use claude for", "copilot", "browser mode"
 
-## Command Pipeline
+**Requires**: `intelligence_mode: web_copilot` or `hybrid` in `config/settings.yaml`
 
-```
-User Input → Orchestrator (gemma3:1b, 5m cache)
-          → JSON: {"agent": "content", "task": "write_post", "model": "gemma3:4b"}
-          → _try_brand() → _try_freelance() → _handle_content() / _handle_jobs()
-          → Content Agent: unload router → load specialist → generate → unload specialist
-          → Post-processing: clean, add repo link, add hashtags
-          → Response displayed + RAM delta shown
-          → Action logged to SQLite
-```
+**Flow**:
+1. Extract page context (CDP → UI-TARS → Playwright fallback)
+2. Draft LLM prompt (cover letter / proposal / LinkedIn / summary)
+3. Open Claude/ChatGPT with stealth browser
+4. Permission gate at every step (open, type, send, use response)
+5. Capture response via MutationObserver + page polling
+6. Save to `memory/content_output/`
 
 ## Directory Structure
 
 ```
 D:\beelal_007\
-├── agent.py                 # ★ Main CLI entry + command parsing + routing
-├── scheduler.py             # ★ Background scheduler (Monday 9am posts, hourly checks)
-├── setup_scheduler_windows.py # ★ Windows Task Scheduler setup (schtasks)
-├── CLAUDE.md                # ★ Project identity + rules for AI assistants
+├── agent.py                 # ★ Main CLI + Mode 2 routing + command parsing
+├── scheduler.py             # ★ Background scheduler (Monday 9am, hourly)
+├── startup.py               # ★ Windows autostart
+├── CLAUDE.md                # ★ Project identity + rules (v3.0)
 ├── agents/                  # Agent definitions
 │   ├── orchestrator.py      # ★ Gemma 3 1B command router
-│   ├── content_agent.py     # ★ Gemma 3 4B content generation (dynamic profile)
+│   ├── content_agent.py     # ★ Gemma 3 4B content generation
+│   ├── model_runner.py      # ★ safe_run() + RAM management
 │   └── nlp_agent.py         # ★ Profile-aware NLP analyst
 ├── tools/                   # Core utilities
-│   ├── model_runner.py      # ★ Ollama wrapper with tiered keep_alive
+│   ├── browser_copilot.py   # ★ Phase 10: Full-chain browser automation
+│   ├── permission_gate.py   # ★ Phase 9: Action approval system
+│   ├── uitars_server.py     # ★ Phase 8: llama.cpp vision model manager
+│   ├── uitars_runner.py     # ★ Phase 8: Screen → API → action pipeline
+│   ├── screen_monitor.py    # ★ Phase 8: Background screenshot cache
 │   ├── content_tools.py     # ★ LinkedIn, cover letter, gig generators
 │   ├── post_scheduler.py    # ★ Weekly posts + hybrid_refine (3 modes)
-│   ├── job_tools.py         # ★ Job scoring via gemma3:1b (profile-matched, cached)
-│   ├── apply_workflow.py    # ★ Full job pipeline: search → score → approve → log
-│   ├── gig_tools.py         # ★ Fiverr/Upwork gig + proposal generation
-│   ├── cdp_interceptor.py   # ★ LinkedIn Voyager API via CDP + stealth
-│   └── browser_tools.py     # ★ Stealth browser: LinkedIn post, Fiverr gig + overlay
+│   ├── job_tools.py         # ★ Job scoring via gemma3:1b
+│   ├── apply_workflow.py    # ★ Full job pipeline
+│   ├── gig_tools.py         # ★ Fiverr/Upwork gig generation
+│   ├── cdp_interceptor.py   # ★ LinkedIn Voyager API via CDP
+│   └── browser_tools.py     # ★ Stealth browser: LinkedIn post, Fiverr gig
 ├── connectors/              # Platform connectors
 │   ├── github_connector.py  # ★ REST API + 24h cache
-│   ├── github_monitor.py    # ★ Activity monitor (repos, commits, stars, READMEs)
-│   ├── jobspy_connector.py  # ★ Multi-site scraper (Indeed, Glassdoor, LinkedIn)
-│   └── freelance_monitor.py # ★ Upwork RSS monitor with keyword matching
+│   ├── github_monitor.py    # ★ Activity monitor
+│   ├── jobspy_connector.py  # ★ Multi-site scraper
+│   └── freelance_monitor.py # ★ Upwork RSS monitor
 ├── memory/                  # Persistent storage
-│   ├── db.py                # ★ SQLite (7 tables: profiles, actions, memory, content,
-│   │                        #          cookies, tasks, seen_projects, github_state)
-│   ├── excel_logger.py      # ★ Excel: applied_jobs.xlsx, gigs_created.xlsx, linkedin_posts.xlsx
-│   ├── agent_memory.db      # SQLite database
-│   ├── github_cache.json    # GitHub API cache (24h)
-│   ├── job_cache.json       # JobSpy search cache (12h)
-│   ├── applied_jobs.xlsx    # Job application tracker
-│   ├── gigs_created.xlsx    # Freelance gig tracker
-│   ├── linkedin_posts.xlsx  # LinkedIn post tracker (Phase 6)
+│   ├── db.py                # ★ SQLite (8+ tables)
+│   ├── excel_logger.py      # ★ Excel: jobs, gigs, posts
+│   ├── content_output/      # ★ Browser Copilot saved responses
 │   ├── screenshots/         # Browser automation screenshots
 │   ├── cover_letters/       # Generated cover letters
 │   ├── gig_drafts/          # Generated gig descriptions
-│   └── post_drafts/         # Generated weekly posts (Phase 6)
+│   └── post_drafts/         # Generated weekly posts
 ├── bridge/                  # FastAPI bridge (localhost:8000)
-│   └── server.py            # ★ 8 endpoints: context_snap, approval, cookies, tasks, ai_response
+│   └── server.py            # ★ 14+ endpoints including permission system
 ├── chrome_extension/        # Manifest V3 Chrome Extension
-│   ├── manifest.json        # ★ Permissions: cookies, scripting, storage, tabs
-│   ├── background.js        # ★ Cookie sync, message relay, task polling
-│   ├── content_script.js    # ★ Context snap, overlay, MutationObserver + task_id
-│   ├── popup.html           # ★ Status popup with bridge connection indicator
-│   ├── popup.js             # ★ Popup logic
-│   └── icons/               # ★ Extension icons (16/48/128px)
+│   ├── manifest.json        # ★ Permissions: cookies, scripting, storage
+│   ├── background.js        # ★ Cookie sync, message relay
+│   ├── content_script.js    # ★ Context snap, overlay, permission overlay
+│   ├── popup.html/js        # ★ Status popup
+│   └── icons/               # ★ Extension icons
 ├── config/                  # Configuration
-│   └── profile.yaml         # ★ Dynamic profile (name, GitHub, degree, skills)
-├── ui/                      # Approval interfaces
-│   └── approval_cli.py      # ★ CLI fallback: [A]pprove / [E]dit / [C]ancel
-├── test_all.py              # ★ Full test suite
-└── docs/                    # Documentation (10 files)
+│   ├── profile.yaml         # ★ Dynamic profile
+│   └── settings.yaml        # ★ Intelligence mode, bridge port
+├── ui/                      # UI interfaces
+│   ├── dashboard.py         # ★ Tkinter 900x700 (overview, UI-TARS, permissions)
+│   └── tray_app.py          # ★ System tray (pystray)
+├── tests/                   # Test suites
+│   ├── test_phase8.py       # ★ UI-TARS: 18/18
+│   ├── test_phase9.py       # ★ Permission Gate: 36/36
+│   ├── test_phase10.py      # ★ Browser Copilot: 40/40
+│   └── test_full_v3.py      # ★ Full verification: 55+ checks
+└── docs/                    # Documentation
+    ├── ARCHITECTURE.md       # ★ This file
+    └── USER_GUIDE.md         # ★ Permission system + Mode 2 guide
 ```
 
-★ = Implemented (Phases 0-6 complete)
+★ = Implemented (Phases 0-10 complete, 55+ files)
 
 ## Key Design Decisions
 
 1. **No paid APIs** — Everything runs locally or via free services
-2. **No Tkinter** — Approval happens via Chrome Extension overlay (CLI fallback)
+2. **No Tkinter for approval** — Approval via Chrome Extension overlay (CLI fallback)
 3. **Never submit without approval** — Hard rule, no exceptions
-4. **RAM-first architecture** — Only one heavy model loaded at a time
-5. **Two-tier routing** — Lightweight 1B routes, heavier 4B executes on-demand
-6. **All model calls through safe_run()** — Never call Ollama directly
-7. **Tiered keep_alive** — Router stays warm (5m), specialists auto-expire (30s) + explicit unload
-8. **Dynamic profile** — All prompts read from profile.yaml, nothing hardcoded
-9. **24h caching** — GitHub data cached to avoid rate limits and speed up responses
-10. **12h job cache** — JobSpy results cached to avoid repeated scraping
-11. **SQLite audit trail** — Every action logged for transparency
-12. **User prompt passthrough** — Full user input passed as `user_request` to all generators
-13. **Profile caching** — job_tools loads profile once, not per-job (in-memory cache)
-14. **Cookie sync** — Chrome Extension syncs cookies → SQLite → Playwright reuses them
-15. **Stealth everywhere** — playwright-stealth on all browser contexts, modern user-agents
-16. **Hybrid Refiner** — Local + Claude web UI for superior LinkedIn content
-17. **GitHub-driven content** — Activity monitor turns real commits/stars into post topics
-18. **Three Excel trackers** — Jobs, gigs, LinkedIn posts with color-coded status
+4. **Never execute without PermissionGate** — Every UI-TARS/browser action gated
+5. **RAM-first architecture** — Only one heavy model loaded at a time
+6. **Two-tier routing** — 1B routes, 4B/vision executes on-demand
+7. **All model calls through safe_run()** — Never call Ollama directly
+8. **Tiered keep_alive** — Router=5m, specialists=30s + explicit unload
+9. **Dynamic profile** — All prompts read from profile.yaml
+10. **24h/12h caching** — GitHub/JobSpy cached to avoid rate limits
+11. **SQLite audit trail** — Every action logged
+12. **Cookie sync** — Extension → SQLite → Playwright
+13. **Stealth everywhere** — playwright-stealth on all browser contexts
+14. **Hybrid Refiner** — Local + Claude web UI for superior content
+15. **GitHub-driven content** — Real commits/stars → post topics
+16. **Three Excel trackers** — Jobs, gigs, LinkedIn posts
+17. **Permission gate on everything** — Allow Once, Allow All, Skip, Stop, Edit
+18. **3-strategy extraction** — CDP, UI-TARS vision, Playwright fallback
+19. **CPU-only vision** — --ngl 0 for UI-TARS (no GPU required)

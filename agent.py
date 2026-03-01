@@ -141,6 +141,44 @@ def handle_command(user_input: str, profile: dict):
     print(f"Command: \"{user_input}\"")
     print(f"{'─' * 60}")
     
+    # Step 0: Check Mode 2 (Browser Copilot) triggers
+    mode_2_triggers = [
+        "apply to this", "help with this page", "summarise this", "summarize this",
+        "write proposal for this", "use claude for", "use chatgpt for",
+        "copilot", "browser mode"
+    ]
+
+    settings = {}
+    try:
+        settings_path = os.path.join(PROJECT_ROOT, "config", "settings.yaml")
+        with open(settings_path, "r", encoding="utf-8") as f:
+            settings = yaml.safe_load(f) or {}
+    except Exception:
+        pass
+
+    intelligence_mode = settings.get("intelligence_mode", "local")
+
+    if any(trigger in user_input.lower() for trigger in mode_2_triggers):
+        if intelligence_mode in ["web_copilot", "hybrid"]:
+            print("\n[MODE 2] Browser Copilot activated")
+            try:
+                from tools.browser_copilot import BrowserCopilot
+                copilot = BrowserCopilot()
+
+                # Detect target LLM
+                target = "claude"
+                if "chatgpt" in user_input.lower():
+                    target = "chatgpt"
+
+                result = copilot.full_flow(user_input, target_llm=target)
+                print(f"[MODE 2] Result: {result.get('status', 'unknown')}")
+                if result.get("status") == "ok":
+                    print(result["response"][:500])
+                return result
+            except Exception as e:
+                print(f"[MODE 2] Error: {e}")
+                # Fall through to normal routing
+
     # Step 1: Route via orchestrator
     print("\n[STEP 1] Routing via Orchestrator (gemma3:1b)...")
     ram_before = get_free_ram()
