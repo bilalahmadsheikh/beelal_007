@@ -63,97 +63,126 @@ class PermissionGate:
 
     def request(self, action: dict, task_id: str = None) -> str:
         """
-        Request permission for an action. Routes through bridge → extension overlay.
-        
-        Args:
-            action: Action dict from UI-TARS (must have 'action', 'description')
-            task_id: Optional task ID for tracking (auto-generated if not provided)
-            
+        Request permission for an action.
+
+        Emits to BOTH:
+          1. Desktop overlay (via singleton — immediate, no polling delay)
+          2. Bridge (so Chrome extension overlay also picks it up)
+
+        Polls both sources every 0.4s until a decision is received.
+
         Returns:
-            "allow" — proceed with execution
-            "skip" — skip this action, move to next
-            "stop" — stop the entire task
-            "edit" — user wants to modify the action
+            "allow" | "skip" | "stop" | "edit"
         """
         if task_id is None:
             task_id = f"perm-{uuid.uuid4().hex[:8]}"
 
         action_type = action.get("action", "unknown")
         description = action.get("description", "No description")
-        confidence = action.get("confidence", 0)
+        confidence  = action.get("confidence", 0)
+
+        # Stamp the action with the task_id so popup can report back
+        action["task_id"] = task_id
 
         # 1. Check Allow All mode
         if self.is_allow_all_active():
-            log.info(f"[PermissionGate] Auto-allowed ({self.time_remaining()} left): {description}")
+            self._log_auto_allowed(action)
             return "allow"
 
         # 2. Check skip types
         if action_type in self.skip_types:
-            log.info(f"[PermissionGate] Action type '{action_type}' in skip list, skipping")
+            log.info(f"[PermissionGate] '{action_type}' in skip list — auto-skip")
             return "skip"
 
-        # 3. Send to bridge for Chrome Extension overlay
+        # 3. Emit to desktop overlay immediately (no HTTP delay)
+        self._emit_to_overlay(action)
+
+        # 4. Also post to bridge (Chrome extension overlay)
         try:
             payload = {
-                "task_id": task_id,
+                "task_id":     task_id,
                 "action_type": action_type,
                 "description": description,
-                "x": action.get("x"),
-                "y": action.get("y"),
-                "text": action.get("text"),
-                "confidence": confidence,
+                "x":           action.get("x"),
+                "y":           action.get("y"),
+                "text":        action.get("text"),
+                "confidence":  confidence,
             }
-
-            resp = requests.post(
+            requests.post(
                 f"{self.bridge_url}/permission/request",
-                json=payload,
-                timeout=5,
+                json=payload, timeout=5,
             )
-
-            if resp.status_code != 200:
-                log.warning(f"[PermissionGate] Bridge returned {resp.status_code}, defaulting to 'stop'")
-                return "stop"
-
         except requests.ConnectionError:
-            log.error("[PermissionGate] Bridge not reachable — cannot get permission")
-            return "stop"
+            log.warning("[PermissionGate] Bridge not reachable — overlay-only mode")
         except Exception as e:
-            log.error(f"[PermissionGate] Error sending request: {e}")
-            return "stop"
+            log.warning(f"[PermissionGate] Bridge post failed: {e}")
 
-        # 4. Poll for decision
-        poll_url = f"{self.bridge_url}/permission/result/{task_id}"
-        timeout = 300  # 5 minutes
-        poll_interval = 0.5
+        # 5. Poll for decision — check overlay cache first (fast), then bridge
+        poll_url   = f"{self.bridge_url}/permission/result/{task_id}"
+        timeout    = 300  # 5 minutes
+        interval   = 0.4
         start_time = time.time()
 
+        print(f"  [GATE] Waiting: {action_type} — {description[:60]}")
+
         while time.time() - start_time < timeout:
+            # Fast path: overlay already recorded a decision
+            decision = self._check_overlay_decision(task_id)
+            if decision:
+                log.info(f"[PermissionGate] Overlay decision: {decision}")
+                if decision == "allow_all":
+                    self.set_allow_all(30)
+                    return "allow"
+                return decision
+
+            # Slow path: poll bridge (Chrome extension may have answered)
             try:
-                resp = requests.get(poll_url, timeout=3)
+                resp = requests.get(poll_url, timeout=2)
                 if resp.status_code == 200:
                     data = resp.json()
-                    decision = data.get("decision", "pending")
-
-                    if decision == "pending":
-                        time.sleep(poll_interval)
-                        continue
-
-                    # Handle "allow_all" — activate auto-approve mode
-                    if decision == "allow_all":
-                        self.set_allow_all(30)
-                        return "allow"
-
-                    log.info(f"[PermissionGate] Decision received: {decision}")
-                    return decision
-
+                    bridge_decision = data.get("decision", "pending")
+                    if bridge_decision not in ("pending", "not_found"):
+                        log.info(f"[PermissionGate] Bridge decision: {bridge_decision}")
+                        if bridge_decision == "allow_all":
+                            self.set_allow_all(30)
+                            return "allow"
+                        return bridge_decision
             except Exception:
                 pass
 
-            time.sleep(poll_interval)
+            time.sleep(interval)
 
-        # Timeout
-        log.warning(f"[PermissionGate] Timeout after {timeout}s waiting for decision")
+        log.warning(f"[PermissionGate] Timeout after {timeout}s — stopping task")
         return "stop"
+
+    # ─── Overlay helpers ──────────────────────────────
+
+    def _emit_to_overlay(self, action: dict):
+        """Emit permission request to desktop overlay singleton (thread-safe)."""
+        try:
+            from ui.desktop_overlay import get_overlay_instance
+            overlay = get_overlay_instance()
+            if overlay is not None:
+                overlay.show_permission_request(action)
+        except Exception:
+            pass
+
+    def _check_overlay_decision(self, task_id: str):
+        """Check if overlay has recorded a decision for task_id. Returns None if pending."""
+        try:
+            from ui.desktop_overlay import get_overlay_instance
+            overlay = get_overlay_instance()
+            if overlay is not None:
+                return overlay.get_permission_decision(task_id)
+        except Exception:
+            pass
+        return None
+
+    def _log_auto_allowed(self, action: dict):
+        remaining = self.time_remaining()
+        desc = action.get("description", "")[:60]
+        log.info(f"[PermissionGate] Auto-allowed ({remaining}): {desc}")
+        print(f"  [GATE] Auto-allowed ({remaining}): {desc}")
 
     def set_allow_all(self, minutes: int = 30):
         """Enable auto-approve for N minutes."""

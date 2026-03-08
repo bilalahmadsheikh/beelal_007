@@ -62,6 +62,16 @@ PERM_COLORS = {
 }
 
 
+# ─── Overlay Singleton ────────────────────────────────
+
+_overlay_instance = None
+
+
+def get_overlay_instance():
+    """Return the running AgentOverlay instance, or None if not started."""
+    return _overlay_instance
+
+
 # ─── Position Persistence ────────────────────────────
 POS_FILE = os.path.join(PROJECT_ROOT, "memory", "overlay_position.json")
 
@@ -487,8 +497,17 @@ class PermissionPopup(QWidget):
 class AgentOverlay(QMainWindow):
     """Floating always-on-top agent interface."""
 
+    # Thread-safe signals — emitted from any thread, delivered on main thread
+    permission_signal = pyqtSignal(dict)    # → _handle_permission_request
+    progress_signal   = pyqtSignal(str, int)  # stage_text, percent → _update_progress
+
     def __init__(self):
         super().__init__()
+
+        # Register singleton so PermissionGate can reach this window from any thread
+        global _overlay_instance
+        _overlay_instance = self
+        self._permission_decisions = {}  # task_id -> decision string
 
         self.setWindowFlags(
             Qt.WindowStaysOnTopHint |
@@ -514,6 +533,8 @@ class AgentOverlay(QMainWindow):
         self.worker.message_ready.connect(self._on_message)
         self.worker.status_update.connect(self._on_status)
         self.worker.permission_needed.connect(self._on_permission)
+        self.permission_signal.connect(self._handle_permission_request)
+        self.progress_signal.connect(self._update_progress)
 
         # Screen annotation layer
         self.annotation = ScreenAnnotation()
@@ -702,6 +723,33 @@ class AgentOverlay(QMainWindow):
 
         container_layout.addWidget(input_frame)
 
+        # ─── Section 3b: Stage + Progress ────────────
+        self.stage_label = QLabel("")
+        self.stage_label.setStyleSheet(
+            f"color: {FG_DIM}; font-size: 10px; padding: 0 8px;"
+        )
+        self.stage_label.hide()
+        container_layout.addWidget(self.stage_label)
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setFixedHeight(3)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setStyleSheet(f"""
+            QProgressBar {{
+                background: {BG_MAIN};
+                border: none;
+                border-radius: 1px;
+            }}
+            QProgressBar::chunk {{
+                background: {ACCENT};
+                border-radius: 1px;
+            }}
+        """)
+        self.progress_bar.hide()
+        container_layout.addWidget(self.progress_bar)
+
         # ─── Section 4: Status Bar ───────────────────
         status_frame = QFrame()
         status_frame.setFixedHeight(26)
@@ -835,6 +883,82 @@ class AgentOverlay(QMainWindow):
     def _on_perm_decision(self, task_id, decision):
         self._add_message(f"Permission: {decision.upper()} ({task_id})", "system")
         self._perm_popup = None
+
+    # ─── Permission Gate Integration ──────────────────
+
+    def show_permission_request(self, action: dict):
+        """
+        Thread-safe entry point called by PermissionGate from the worker thread.
+        Emits signal → handled on main thread.
+        """
+        self.permission_signal.emit(action)
+
+    def get_permission_decision(self, task_id: str):
+        """
+        Called by PermissionGate (worker thread) to check if overlay recorded a decision.
+        Returns decision string or None if still pending.
+        """
+        return self._permission_decisions.get(task_id)
+
+    def _handle_permission_request(self, action: dict):
+        """
+        Main-thread handler. Adds a notification to conversation and shows popup.
+        """
+        # Normalise keys — gate sends "action", PermissionPopup expects "action_type"
+        action_type = action.get("action", action.get("action_type", "action")).upper()
+        description = action.get("description", "Agent wants to perform an action")
+        task_id     = action.get("task_id", "?")
+        confidence  = action.get("confidence", 1.0)
+        conf_pct    = int(confidence * 100)
+
+        # Add waiting message to conversation
+        self._add_message(
+            f"🔐 [{action_type}] {conf_pct}% — {description}",
+            "system"
+        )
+
+        # Build normalised dict for PermissionPopup (expects "action_type" key)
+        normalised = dict(action)
+        normalised["action_type"] = action_type.lower()
+
+        # Show the existing PermissionPopup near cursor
+        popup = PermissionPopup(normalised, parent=None)
+        popup.decision_made.connect(self._on_gate_popup_decision)
+        popup.show()
+        popup.raise_()
+        popup.activateWindow()
+        # Keep reference so it is not garbage-collected
+        self._perm_popup = popup
+
+    def _on_gate_popup_decision(self, task_id: str, decision: str):
+        """Slot for PermissionPopup.decision_made — records and shows result."""
+        self._record_permission_decision(task_id, decision)
+
+    def _record_permission_decision(self, task_id: str, decision: str):
+        """Store decision so PermissionGate can pick it up during polling."""
+        self._permission_decisions[task_id] = decision
+        labels = {
+            "allow":     "✓ ALLOWED",
+            "allow_all": "⚡ ALLOW ALL (30m)",
+            "skip":      "⏭ SKIPPED",
+            "stop":      "✕ STOPPED",
+            "edit":      "✏ EDIT",
+        }
+        self._add_message(f"  → {labels.get(decision, decision.upper())}", "system")
+        print(f"  [OVERLAY] Permission {task_id}: {decision}")
+
+    # ─── Progress Bar ──────────────────────────────────
+
+    def _update_progress(self, stage: str, percent: int):
+        """Update stage label and progress bar. Must run on main thread (via signal)."""
+        if stage:
+            self.stage_label.setText(stage)
+            self.stage_label.show()
+            self.progress_bar.setValue(max(0, min(100, percent)))
+            self.progress_bar.show()
+        else:
+            self.stage_label.hide()
+            self.progress_bar.hide()
 
     def _snap_screen(self):
         try:

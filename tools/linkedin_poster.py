@@ -26,6 +26,35 @@ sys.path.insert(0, PROJECT_ROOT)
 
 BRIDGE = "http://localhost:8000"
 LINKEDIN_FEED = "https://www.linkedin.com/feed/"
+EXTENSION_DIR = os.path.join(PROJECT_ROOT, "chrome_extension")
+
+
+# ─── Chrome profile helpers (module-level) ────────────
+
+def _get_chrome_profile_path() -> str:
+    """Return the default Chrome User Data directory on Windows, or None."""
+    candidates = [
+        os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\User Data"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome Beta\User Data"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Chromium\User Data"),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def _get_chrome_executable() -> str:
+    """Return the Chrome executable path on Windows, or 'chrome' as fallback."""
+    candidates = [
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return "chrome"
 
 
 class LinkedInPoster:
@@ -37,6 +66,85 @@ class LinkedInPoster:
         self.page = None
         self.context = None
         self._pw = None
+
+    # ── Chrome profile launch ─────────────────────────
+
+    def _progress(self, stage: str, percent: int):
+        """Send progress update to desktop overlay if running."""
+        print(f"  [PROGRESS] {percent}% — {stage}")
+        try:
+            from ui.desktop_overlay import get_overlay_instance
+            overlay = get_overlay_instance()
+            if overlay is not None:
+                overlay.progress_signal.emit(stage, percent)
+        except Exception:
+            pass
+
+    def _close_chrome_with_permission(self) -> bool:
+        """Ask permission before killing Chrome (needed to unlock the profile)."""
+        decision = self.gate.request({
+            "action": "open_browser",
+            "description": (
+                "Chrome needs to close briefly so the agent can use your "
+                "LinkedIn session. Chrome will reopen with your full profile. "
+                "Save any open work, then click Allow."
+            ),
+            "confidence": 1.0,
+            "task_id": f"chrome_close_{self.task_id}",
+        })
+        if decision not in ("allow", "allow_all"):
+            return False
+        print("  [CHROME] Closing Chrome to free profile lock...")
+        os.system("taskkill /F /IM chrome.exe /T >nul 2>&1")
+        time.sleep(2.5)
+        return True
+
+    def _launch_with_existing_profile(self) -> bool:
+        """
+        Launch Playwright using the user's real Chrome profile directory.
+        LinkedIn session cookies are already present — no login needed.
+        Chrome must be fully closed before calling this (profile lock).
+        Returns True on success.
+        """
+        from playwright.sync_api import sync_playwright
+
+        profile_path = _get_chrome_profile_path()
+        chrome_exe   = _get_chrome_executable()
+
+        if not profile_path:
+            raise RuntimeError(
+                "Chrome profile directory not found. "
+                "Is Chrome installed at a standard path?"
+            )
+
+        print(f"  [CHROME] Profile : {profile_path}")
+        print(f"  [CHROME] Exe     : {chrome_exe}")
+
+        self._pw = sync_playwright().__enter__()
+
+        # launch_persistent_context keeps all cookies, localStorage, sessions
+        self.context = self._pw.chromium.launch_persistent_context(
+            user_data_dir=profile_path,
+            executable_path=chrome_exe,
+            headless=False,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                # Load the BilalAgent extension so permission overlays work in Chrome
+                f"--disable-extensions-except={EXTENSION_DIR}",
+                f"--load-extension={EXTENSION_DIR}",
+            ],
+            ignore_default_args=["--enable-automation"],
+            viewport={"width": 1280, "height": 800},
+            slow_mo=50,
+        )
+
+        pages = self.context.pages
+        self.page = pages[0] if pages else self.context.new_page()
+        print("  [CHROME] ✓ Launched with your Chrome profile")
+        print("  [CHROME] ✓ Extension loaded")
+        return True
 
     # ── Bridge helpers ────────────────────────────────
 
@@ -83,43 +191,25 @@ class LinkedInPoster:
             "status": "active",
         })
 
-        # ── PERMISSION 1: Open browser ────────────────
-        decision = self.gate.request({
-            "action": "open_browser",
-            "description": "Open LinkedIn.com to post your content",
-            "confidence": 1.0,
-            "task_id": f"li_open_{self.task_id}",
-        })
-        if decision not in ("allow", "allow_all"):
+        # ── PERMISSION 1: Close Chrome + reopen with profile ─
+        # This single gate covers closing Chrome and reopening it.
+        if not self._close_chrome_with_permission():
             return {"status": "cancelled",
-                    "reason": f"Permission denied: open browser ({decision})"}
+                    "reason": "Permission denied: Chrome profile launch"}
 
-        # ── OPEN BROWSER ──────────────────────────────
+        # ── OPEN BROWSER WITH REAL PROFILE ────────────
+        self._progress("🌐 Opening Chrome with your profile", 52)
         try:
-            from playwright.sync_api import sync_playwright
-            self._pw = sync_playwright().__enter__()
-            browser = self._pw.chromium.launch(
-                headless=False,
-                args=["--disable-blink-features=AutomationControlled",
-                      "--no-sandbox"],
-            )
-            self.context = browser.new_context(
-                user_agent=(
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/120.0.0.0 Safari/537.36"
-                ),
-                viewport={"width": 1280, "height": 800},
-            )
-            self.page = self.context.new_page()
+            self._launch_with_existing_profile()
             self.page.goto(LINKEDIN_FEED,
                            wait_until="domcontentloaded", timeout=30000)
             time.sleep(2)
         except Exception as e:
-            return {"status": "failed", "reason": f"Browser launch failed: {e}"}
+            return {"status": "failed", "reason": f"Chrome launch failed: {e}"}
 
         # ── CHECK LOGIN ───────────────────────────────
         if "login" in self.page.url or "checkpoint" in self.page.url:
+            self._progress("🔑 Waiting for LinkedIn login...", 54)
             print("  [LINKEDIN] Not logged in — waiting up to 60s for manual login")
             for _ in range(60):
                 time.sleep(1)
@@ -130,6 +220,7 @@ class LinkedInPoster:
                 self.page.close()
                 return {"status": "failed", "reason": "Not logged in to LinkedIn"}
 
+        self._progress("🔗 LinkedIn feed loaded", 58)
         print("  [LINKEDIN] Feed loaded")
 
         # ── CLICK START A POST ────────────────────────
@@ -154,6 +245,7 @@ class LinkedInPoster:
 
         time.sleep(1.5)
         self._wait_for_extension_state("composer_open", timeout=10)
+        self._progress("📝 Composer open", 63)
 
         # ── PERMISSION 2: Type post ───────────────────
         preview = content[:100].replace("\n", " ")
@@ -192,6 +284,7 @@ class LinkedInPoster:
             self.page.close()
             return {"status": "failed", "reason": "Could not find post editor"}
 
+        self._progress("✍ Post typed into composer", 72)
         time.sleep(0.8)
 
         # ── TERMINAL PREVIEW ──────────────────────────
@@ -218,6 +311,7 @@ class LinkedInPoster:
                 "reason": "User chose not to publish — post typed but not sent",
             }
 
+        self._progress("📤 Submitting post to LinkedIn", 85)
         # ── CLICK POST BUTTON ─────────────────────────
         post_selectors = [
             "button.share-actions__primary-action",
@@ -244,6 +338,7 @@ class LinkedInPoster:
         # ── WAIT FOR EXTENSION CONFIRMATION ──────────
         confirmed = self._wait_for_extension_state("post_confirmed", timeout=15)
         posted_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self._progress("✅ Post published on LinkedIn", 100)
 
         # ── LOG SUCCESS ───────────────────────────────
         try:
@@ -276,12 +371,14 @@ class LinkedInPoster:
             "posted_at": posted_at,
         })
 
-        self.page.close()
-        if self._pw:
-            try:
-                self._pw.__exit__(None, None, None)
-            except Exception:
-                pass
+        # Leave Chrome open so user can continue browsing after posting.
+        # Only close the page we used; keep the context (Chrome window) running.
+        try:
+            self.page.close()
+        except Exception:
+            pass
+        # Clear progress bar
+        self._progress("", 0)
 
         print(f"  [LINKEDIN] Posted at {posted_at}")
         return {

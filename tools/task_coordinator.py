@@ -8,6 +8,7 @@ Every multi-step task runs through here.
 
 import os
 import sys
+import time
 import uuid
 import requests
 from datetime import datetime
@@ -64,14 +65,27 @@ class TaskCoordinator:
 
     # ── Internal helpers ──────────────────────────────
 
-    def _notify(self, message: str, msg_type: str = "system"):
-        """Send update to overlay AND print to terminal."""
+    def _notify(self, message: str, msg_type: str = "system",
+                stage: str = None, progress: int = None):
+        """Send update to overlay AND print to terminal. Optionally emit progress."""
         if self._overlay_cb:
             try:
                 self._overlay_cb(message, msg_type)
             except Exception:
                 pass
+        if stage is not None and progress is not None:
+            self._emit_progress(stage, progress)
         print(f"  [COORD] {message}")
+
+    def _emit_progress(self, stage: str, percent: int):
+        """Emit progress update to overlay (thread-safe via Qt signal)."""
+        try:
+            from ui.desktop_overlay import get_overlay_instance
+            overlay = get_overlay_instance()
+            if overlay is not None:
+                overlay.progress_signal.emit(stage, percent)
+        except Exception:
+            pass
 
     def _bridge_post(self, endpoint: str, data: dict):
         try:
@@ -207,50 +221,73 @@ class TaskCoordinator:
 
         try:
             task.status = "running"
+            self._emit_progress("🧠 Routing...", 5)
             intent = self._detect_intent(task)
             task.log(f"Intent: {intent['action']} | {intent['description']}")
-            self._notify(f"On it — {intent['description']}", "system")
+            self._notify(f"On it — {intent['description']}", "system",
+                         stage="🧠 Routing complete", progress=10)
 
             # ── Step 1: generate content ──────────────
             if intent["needs_generation"]:
                 task.status = "generating"
-                self._notify("Generating content...", "system")
+                self._notify("Generating content with local model...", "system",
+                             stage="✍ Generating...", progress=20)
                 content = self._generate(task, intent)
                 if not content:
                     raise RuntimeError(f"Content generation failed: {task.error}")
                 task.generated_content = content
-                task.log(f"Generated {len(content.split())} words")
-                self._notify(content, "agent")
+                word_count = len(content.split())
+                task.log(f"Generated {word_count} words")
+                self._notify(content, "agent",
+                             stage=f"✍ Generated {word_count} words", progress=45)
 
             # ── Step 2: execute action ────────────────
             action = intent["action"]
 
             if action == "post_linkedin":
                 task.status = "uploading"
-                self._notify("Starting LinkedIn upload...", "system")
+                self._notify("Starting LinkedIn upload...", "system",
+                             stage="📤 Preparing LinkedIn upload", progress=50)
                 result = self._post_linkedin(task)
                 task.result = result
                 if result["status"] == "posted":
                     self._notify(
-                        f"Posted to LinkedIn at {result['posted_at']}", "system"
+                        f"✅ Posted to LinkedIn at {result['posted_at']}", "system",
+                        stage="✅ Posted successfully", progress=100
                     )
+                    # Clear progress bar after 3 seconds
+                    import threading
+                    def _clear():
+                        time.sleep(3)
+                        self._emit_progress("", 0)
+                    threading.Thread(target=_clear, daemon=True).start()
                 elif result["status"] == "cancelled":
-                    self._notify("Upload cancelled — post saved to Excel", "system")
+                    self._notify("Upload cancelled — post saved to Excel", "system",
+                                 stage="⏸ Cancelled", progress=0)
                 else:
-                    self._notify(f"Upload failed: {result['reason']}", "error")
+                    self._notify(f"Upload failed: {result['reason']}", "error",
+                                 stage=f"✗ Failed", progress=0)
 
             elif action == "generate_content":
                 task.result = {"status": "done",
                                "content": task.generated_content}
+                self._emit_progress("", 0)
 
             elif action in ("job_search", "github_query", "agent_pipeline"):
                 task.status = "running"
+                self._emit_progress("🔍 Running pipeline...", 60)
                 output = self._run_pipeline(task)
                 task.result = {"status": "done", "output": output}
-                self._notify(output, "agent")
+                self._notify(output, "agent", stage="✅ Done", progress=100)
+                import threading
+                def _clear2():
+                    time.sleep(3)
+                    self._emit_progress("", 0)
+                threading.Thread(target=_clear2, daemon=True).start()
 
             else:
                 task.result = {"status": "unknown_action", "action": action}
+                self._emit_progress("", 0)
 
             task.status = "done"
             task.log("Task complete")
@@ -259,7 +296,8 @@ class TaskCoordinator:
             task.status = "failed"
             task.error = str(e)
             task.log(f"FAILED: {e}")
-            self._notify(f"Task failed: {e}", "error")
+            self._notify(f"Task failed: {e}", "error",
+                         stage="✗ Error", progress=0)
 
         return task
 
