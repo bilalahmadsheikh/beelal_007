@@ -1,6 +1,29 @@
-# Changelog — BilalAgent v2.0
+# Changelog — BilalAgent v3.0
 
 All notable changes to this project, listed by date.
+
+---
+
+## 2026-03-08
+
+### v3.0 Build — Steps 1-5 (Phi-4, Extension Bridge, LinkedIn Upload, Task Coordinator)
+
+**Added:**
+- `tools/linkedin_poster.py` — Full Playwright LinkedIn upload flow with 3 PermissionGate checkpoints (open browser → type post → click Post). Extension-confirmed via `post_confirmed` state. Logs to Excel + SQLite.
+- `tools/task_coordinator.py` — Unified task runner. Intent detection → content generation → action execution → overlay callback. `get_coordinator()` singleton.
+- `tools/uitars_server.py` — Added `LlamaCppServer` class with `MODEL_REGISTRY` (uitars-2b, uitars-7b, phi4-mini). Phi-4 Mini served on port 8082 via llama.cpp. `get_llamacpp_server()` singleton.
+- `memory/excel_logger.py` — `log_linkedin_post()` wrapper added for post-generation + post-upload logging.
+
+**Modified:**
+- `agent.py` — Full `argparse`: `--overlay` (PyQt5 GUI), `--bridge` (uvicorn :8000), positional command. Upload trigger keywords wired to `LinkedInPoster`.
+- `bridge/server.py` — New endpoints: `GET /status`, `POST /tasks/register`, `GET /tasks/active`, `POST /tasks/complete`, `GET /tasks/status/{id}`, `POST /extension/page_state`, `GET /extension/page_state/{id}`.
+- `chrome_extension/content_script.js` — Feature 5 added: `pollActiveTasks()`, `watchLinkedInPage()` (MutationObserver for `composer_open`/`post_confirmed`), `checkBridge()` liveness gate.
+- `tools/content_tools.py` — Hard 180-320 word count enforcement with LLM trim/expand. Auto-logs every LinkedIn post to Excel + SQLite after generation.
+- `tests/test_full_v3.py` — Phase 12 added (27 new checks). Total: 86/90 pass.
+- `CLAUDE.md` — v3.0 architecture fully documented.
+
+**Phi-4 Mini path:** `D:\local_models\bartowski\microsoft_Phi-4-mini-instruct-GGUF\microsoft_Phi-4-mini-instruct-Q4_K_S.gguf`
+**Commit:** `3b15e63`
 
 ---
 

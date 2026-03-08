@@ -2,7 +2,7 @@
 
 ## Overview
 
-BilalAgent is a personal AI desktop agent that runs 100% locally with no paid APIs. It uses multiple Ollama models with **tiered keep_alive caching**, a **UI-TARS vision model** via llama.cpp, and a **permission-gated browser copilot** for full automation. **Phases 0-10 complete.**
+BilalAgent is a personal AI desktop agent that runs 100% locally with no paid APIs. It uses multiple Ollama models with **tiered keep_alive caching**, a **UI-TARS vision model** via llama.cpp, and a **permission-gated browser copilot** for full automation. **Phases 0-12 + v3.0 Build Steps 1-5 complete.**
 
 ## System Diagram
 
@@ -17,19 +17,22 @@ BilalAgent is a personal AI desktop agent that runs 100% locally with no paid AP
 └────────────────────┬────────────────────────────┘
                      │ HTTP (localhost:8000)
 ┌────────────────────▼────────────────────────────┐
-│               FastAPI Bridge                     │
-│  /command /approve /status /ai_response          │
-│  /context_snap /cookies /register_task           │
-│  ★ /permission/request /pending /result          │
-│  ★ /permission/set_allow_all /allow_all_status   │
+│               FastAPI Bridge (:8000)             │
+│  /status /route /ai_response /context_snap       │
+│  /cookies /permission/request /pending /result   │
+│  /permission/set_allow_all /allow_all_status     │
+│  ★ /tasks/register /active /complete /status     │
+│  ★ /extension/page_state (GET+POST)              │
 └────────────────────┬────────────────────────────┘
                      │
 ┌────────────────────▼────────────────────────────┐
 │          agent.py — Main Entry Point             │
 │   Startup: DB init → Profile → GitHub Sync       │
+│   --overlay (PyQt5) | --bridge (uvicorn :8000)   │
 │   CLI: python agent.py "command"                 │
 │   ★ Mode 2 Check → Browser Copilot triggers      │
 │   Routing: brand → freelance → content → jobs    │
+│   ★ Upload trigger → LinkedInPoster              │
 └────────────────────┬────────────────────────────┘
                      │
 ┌────────────────────▼────────────────────────────┐

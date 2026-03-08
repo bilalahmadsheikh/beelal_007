@@ -1,6 +1,42 @@
-# Phase Log — BilalAgent v2.0
+# Phase Log — BilalAgent v3.0
 
 Progress tracker updated after each phase is completed.
+
+---
+
+## v3.0 Build Steps 1-5 ✅
+
+**Date:** 2026-03-08
+**Status:** COMPLETE — 86/90 tests pass
+
+### Step 1 — Partial gaps fixed
+- [x] `agent.py` argparse: `--overlay`, `--bridge`, positional command
+- [x] `memory/excel_logger.py`: `log_linkedin_post()` added
+- [x] `tools/content_tools.py`: 180-320 word enforcement + auto-logging + upload trigger
+- [x] `bridge/server.py`: `GET /status` health check added
+
+### Step 2 — Phi-4 Mini integration
+- [x] `LlamaCppServer` class in `tools/uitars_server.py`
+- [x] `MODEL_REGISTRY`: uitars-2b, uitars-7b, phi4-mini (port 8082)
+- [x] `_find_phi4_gguf()` auto-detects GGUF in model dir
+- [x] Phi-4 GGUF found: `microsoft_Phi-4-mini-instruct-Q4_K_S.gguf`
+
+### Step 3 — Chrome Extension bridge connection
+- [x] `bridge/server.py`: 6 new task + page_state endpoints
+- [x] `content_script.js`: `pollActiveTasks()`, `watchLinkedInPage()`, `checkBridge()`
+- [x] LinkedIn MutationObserver: `page_loaded` → `composer_open` → `post_confirmed`
+
+### Step 4 — LinkedIn Poster
+- [x] `tools/linkedin_poster.py` created (full Playwright flow)
+- [x] 3 PermissionGate checkpoints before any action
+- [x] Extension confirmation via `/extension/page_state`
+- [x] Logs to `linkedin_posts.xlsx` + SQLite
+
+### Step 5 — Task Coordinator
+- [x] `tools/task_coordinator.py` created
+- [x] Intent detection: content / post_linkedin / job_search / pipeline
+- [x] Overlay callback for live status updates
+- [x] `get_coordinator()` singleton
 
 ---
 

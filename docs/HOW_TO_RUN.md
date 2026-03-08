@@ -26,6 +26,8 @@ The bridge connects Chrome Extension ↔ Python agent. **Start this first.**
 
 ```bash
 cd D:\beelal_007
+python agent.py --bridge
+# or directly:
 uvicorn bridge.server:app --port 8000
 ```
 
@@ -441,13 +443,68 @@ models:
 
 ---
 
+## 17. Desktop Overlay (v3.0)
+
+Always-on-top PyQt5 window — primary interaction UI.
+
+```bash
+python agent.py --overlay
+```
+
+**Hotkeys:**
+- `Ctrl+Space` — toggle show/hide
+- `Ctrl+Shift+S` — emergency stop
+- `Ctrl+Shift+B` — snap screen + open overlay
+
+---
+
+## 18. LinkedIn Upload (v3.0)
+
+Generate a post and upload it live to LinkedIn in one command:
+
+```bash
+python agent.py "write and upload a linkedin post about basepy-sdk"
+# or:
+python agent.py "write and post a linkedin post about basepy-sdk"
+```
+
+**What happens:**
+1. gemma3:4b generates a 180-320 word post with repo data
+2. Post logged to `linkedin_posts.xlsx`
+3. Permission overlay: "Open LinkedIn" → Allow Once
+4. Playwright opens `linkedin.com/feed`
+5. Permission overlay: "Type post into composer" → Allow Once
+6. Post typed character by character (15ms delay)
+7. Permission overlay: "Click POST — LIVE" → Allow Once
+8. Chrome extension confirms `post_confirmed` via MutationObserver
+9. Logged to `linkedin_posts.xlsx` with status=uploaded
+
+---
+
+## 19. Start Phi-4 Mini (v3.0)
+
+Smarter routing model via llama.cpp on port 8082:
+
+```bash
+python -c "
+from tools.uitars_server import LlamaCppServer
+s = LlamaCppServer()
+print(s.start('phi4-mini'))   # True when ready
+print(s.get_status())
+"
+```
+
+---
+
 ## Quick Reference
 
 | Action | Command |
 |---|---|
-| Start bridge | `uvicorn bridge.server:app --port 8000` |
+| Start bridge | `python agent.py --bridge` |
+| Desktop overlay | `python agent.py --overlay` |
 | Brand check | `python agent.py "brand check"` |
 | Write post | `python agent.py "write linkedin post about basepy"` |
+| Write + upload | `python agent.py "write and upload linkedin post about basepy"` |
 | Weekly posts | `python agent.py "generate weekly posts"` |
 | Search jobs | `python agent.py "search python jobs"` |
 | Cover letter | `python agent.py "write cover letter for..."` |
@@ -455,7 +512,7 @@ models:
 | Copilot mode | `python agent.py "copilot"` (needs web_copilot mode) |
 | Dashboard | `python ui/dashboard.py` |
 | System tray | `python ui/tray_app.py` |
-| Run tests | `python tests/test_full_v3.py` |
+| Run tests | `python -X utf8 tests/test_full_v3.py` |
 
 ---
 

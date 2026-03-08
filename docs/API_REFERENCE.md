@@ -1,4 +1,112 @@
-# API Reference — BilalAgent v2.0
+# API Reference — BilalAgent v3.0
+
+---
+
+## tools/linkedin_poster.py (v3.0)
+
+### `LinkedInPoster().post(content, source_task="") → dict`
+Full Playwright LinkedIn posting flow with 3 permission gates.
+
+| Param | Type | Description |
+|---|---|---|
+| `content` | `str` | The post text to publish |
+| `source_task` | `str` | Original user command (for logging) |
+| **Returns** | `dict` | `{status, reason, posted_at, word_count, extension_confirmed}` |
+
+Status values: `posted` / `cancelled` / `failed`
+
+---
+
+## tools/task_coordinator.py (v3.0)
+
+### `TaskCoordinator.run(user_input) → Task`
+Unified end-to-end task runner.
+
+```python
+from tools.task_coordinator import get_coordinator
+coord = get_coordinator()
+coord.set_overlay_callback(lambda msg, type: print(msg))
+task = coord.run("write and upload a linkedin post about basepy-sdk")
+print(task.status)   # "done"
+print(task.steps)    # list of {step, time} dicts
+```
+
+### `TaskCoordinator.set_overlay_callback(fn)`
+Register a callback `fn(message: str, type: str)` for live overlay updates.
+
+### `get_coordinator() → TaskCoordinator`
+Module-level singleton accessor.
+
+---
+
+## tools/uitars_server.py — LlamaCppServer (v3.0)
+
+### `LlamaCppServer.start(model_key) → bool`
+Start a llama.cpp model server. Polls `/health` until ready (up to 120s).
+
+| `model_key` | Port | RAM | Description |
+|---|---|---|---|
+| `"uitars-2b"` | 8081 | 2.5GB | UI-TARS 2B vision model |
+| `"uitars-7b"` | 8081 | 5.5GB | UI-TARS 7B vision model |
+| `"phi4-mini"` | 8082 | 2.5GB | Phi-4 Mini text model (auto-detected) |
+
+### `LlamaCppServer.is_running(model_key) → bool`
+Health check via `GET /health` on the model's port.
+
+### `LlamaCppServer.get_status() → dict`
+Returns `{model_key: bool}` for all registered models.
+
+### `get_llamacpp_server() → LlamaCppServer`
+Module-level singleton accessor.
+
+### `_find_phi4_gguf() → str | None`
+Auto-detects the best Phi-4 GGUF quantization in the model directory.
+
+---
+
+## bridge/server.py — New Endpoints (v3.0)
+
+### `GET /status`
+Health check. Returns `{"status": "ok", "version": "3.0"}`.
+
+### `POST /tasks/register`
+Register a task so the Chrome extension starts watching.
+```json
+{"task_id": "abc123", "type": "linkedin_post", "content_preview": "...", "status": "active"}
+```
+
+### `GET /tasks/active`
+Returns list of all active tasks. Extension polls this every 2s.
+
+### `POST /tasks/complete`
+Mark a task complete with optional `posted_at` timestamp.
+
+### `GET /tasks/status/{task_id}`
+Get status of a specific task.
+
+### `POST /extension/page_state`
+Chrome extension reports LinkedIn page state changes.
+```json
+{"task_id": "abc123", "state": "post_confirmed", "url": "https://linkedin.com/feed"}
+```
+States: `page_loaded` → `composer_open` → `post_confirmed`
+
+### `GET /extension/page_state/{task_id}`
+Poll for the latest state reported by the extension.
+
+---
+
+## memory/excel_logger.py — New Functions (v3.0)
+
+### `log_linkedin_post(content, platform, repo, word_count, status, model_used, posted_at)`
+Logs a LinkedIn post to `linkedin_posts.xlsx`. Wrapper over `log_post()`.
+
+| `status` values | Meaning |
+|---|---|
+| `"generated"` | Post created, not yet uploaded |
+| `"uploaded"` | Posted live to LinkedIn |
+
+---
 
 ## tools/model_runner.py
 
