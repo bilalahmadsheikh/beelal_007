@@ -284,8 +284,12 @@ class PermissionPopup(QWidget):
 
     def __init__(self, action: dict, parent=None):
         super().__init__(parent)
-        self.action = action
+        self.action  = action
         self.task_id = action.get("task_id", "unknown")
+
+        # Must be set before _build_ui() — used in countdown bar setup
+        self._timeout = 300  # 5 minutes
+        self._elapsed = 0
 
         self.setWindowFlags(
             Qt.WindowStaysOnTopHint |
@@ -298,9 +302,6 @@ class PermissionPopup(QWidget):
         self._build_ui()
         self._position_near_cursor()
 
-        # Countdown timer
-        self._timeout = 300  # 5 minutes
-        self._elapsed = 0
         self._countdown = QTimer(self)
         self._countdown.timeout.connect(self._tick)
         self._countdown.start(1000)
