@@ -1,16 +1,19 @@
 """
-content_agent.py — BilalAgent v2.0 Content Generation Agent
+content_agent.py — BilalAgent v3.1 Content Generation Agent
 Professional Content Strategist for AI/ML Developers.
 Primary: Gemma 3 4B (best 4B content model, same family as orchestrator, 3.3GB)
 Fallback: Gemma 2 9B (reliable, well-tested)
+
+Fixed in v3.1: Aggressive RAM management — unloads router, waits for RAM, retries.
 """
 
 import sys
 import os
 import yaml
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from tools.model_runner import safe_run, get_free_ram, force_unload
+from tools.model_runner import safe_run, get_free_ram, force_unload, unload_all_specialists
 
 
 def _load_settings() -> dict:
@@ -71,6 +74,35 @@ Rules:
 - Write in first person as {name}"""
 
 
+def _free_ram_for_specialist(required_gb: float = 3.0) -> float:
+    """
+    Aggressively free RAM by unloading ALL models (including router).
+    Waits up to 10 seconds for RAM to actually free up.
+    Returns: available RAM in GB after freeing.
+    """
+    free = get_free_ram()
+    if free >= required_gb:
+        return free
+    
+    print(f"  [RAM] Only {free:.1f}GB free, need {required_gb:.1f}GB — unloading ALL models...")
+    
+    # Unload everything — router + specialists
+    settings = _load_settings()
+    router_model = settings.get("routing_model", "gemma3:1b")
+    force_unload(router_model)
+    unload_all_specialists()
+    
+    # Wait for OS to reclaim memory — check every second up to 10s
+    for i in range(10):
+        time.sleep(1)
+        free = get_free_ram()
+        print(f"  [RAM] Wait {i+1}s: {free:.1f}GB free")
+        if free >= required_gb:
+            return free
+    
+    return free
+
+
 def generate(prompt: str, content_type: str = "general") -> str:
     """
     Generate content using the best available model.
@@ -83,7 +115,6 @@ def generate(prompt: str, content_type: str = "general") -> str:
     Returns:
         Generated content string
     """
-    free = get_free_ram()
     system_prompt = _build_system_prompt()
     
     settings = _load_settings()
@@ -91,15 +122,13 @@ def generate(prompt: str, content_type: str = "general") -> str:
     fallback_model = settings.get("content_model_fallback", "gemma2:9b")
     router_model = settings.get("routing_model", "gemma3:1b")
     
+    # Step 1: Free RAM aggressively before loading the content model
+    free = _free_ram_for_specialist(2.0)
+    
     # Try primary model first (best quality)
-    if free >= 3.0:
-        # Unload orchestrator to free RAM for specialist
-        force_unload(router_model)
-        import time; time.sleep(1)
-        free = get_free_ram()
-        
+    if free >= 2.0:
         print(f"[CONTENT] Using {primary_model} (primary) — {free:.1f}GB free")
-        result = safe_run(primary_model, prompt, required_gb=3.0, system=system_prompt)
+        result = safe_run(primary_model, prompt, required_gb=1.5, system=system_prompt)
         
         if not result.startswith("[ERROR]") and len(result) > 100:
             force_unload(primary_model)  # Free RAM after generation
@@ -109,19 +138,24 @@ def generate(prompt: str, content_type: str = "general") -> str:
         if result.startswith("[ERROR]"):
             print(f"[CONTENT] {primary_model} failed: {result}")
         
-        # Quality check failed — retry once
+        # Quality check failed — retry once with more explicit prompt
         if not result.startswith("[ERROR]") and len(result) < 150:
-            print(f"[CONTENT] Output too short, retrying with {primary_model}...")
-            result = safe_run(primary_model, prompt + "\n\nIMPORTANT: Write a complete, detailed response of at least 250 words.", required_gb=3.0, system=system_prompt)
+            print(f"[CONTENT] Output too short ({len(result)} chars), retrying with {primary_model}...")
+            result = safe_run(
+                primary_model,
+                prompt + "\n\nIMPORTANT: Write a complete, detailed response of at least 250 words.",
+                required_gb=1.5,
+                system=system_prompt,
+            )
             if not result.startswith("[ERROR]"):
                 force_unload(primary_model)
                 return result
     
-    # Fallback model
-    free = get_free_ram()
-    if free >= 6.0:
+    # Fallback model (needs more RAM)
+    free = _free_ram_for_specialist(5.0)
+    if free >= 5.0:
         print(f"[CONTENT] Using {fallback_model} (fallback) — {free:.1f}GB free")
-        result = safe_run(fallback_model, prompt, required_gb=6.0, system=system_prompt)
+        result = safe_run(fallback_model, prompt, required_gb=4.5, system=system_prompt)
         if not result.startswith("[ERROR]"):
             force_unload(fallback_model)
             return result

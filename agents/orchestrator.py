@@ -1,10 +1,13 @@
 """
-orchestrator.py — BilalAgent v2.0 Command Router
+orchestrator.py — BilalAgent v3.1 Command Router
 Uses Gemma 3 1B to classify user commands and route to the right agent.
 Always-on, lightweight (~1GB RAM), JSON-only output.
+
+Fixed in v3.1: robust JSON parsing, num_predict=150, regex fallback.
 """
 
 import json
+import re
 import sys
 import os
 import yaml
@@ -24,25 +27,30 @@ def _get_routing_model() -> str:
         return "gemma3:1b"
 
 
-ROUTER_SYSTEM_PROMPT = """You are a command router for a personal AI agent. Your ONLY job is to output valid JSON.
+# Short, explicit prompt that forces clean JSON from a 1B model
+ROUTER_SYSTEM_PROMPT = """You are a task router. Respond with ONLY a JSON object, nothing else.
+No explanation. No markdown. No code fences. Just the raw JSON.
 
-Given a user command, classify it and output JSON with these exact keys:
-- "agent": one of "nlp", "content", "navigation", "memory"
-- "task": a short task name like "profile_query", "project_info", "write_cover_letter", "browse_jobs", "save_data", "analyze_job"
-- "model": the model to use, one of "gemma3:1b", "phi4-mini", "gemma3:4b"
+Respond with exactly this structure:
+{"agent": "content", "task": "write_post", "model": "gemma3:4b", "mode": "local", "needs_screen": false}
+
+agent options: content, nlp, jobs, navigation, memory, brand, github
+task: a short task name
+model options: gemma3:4b, gemma3:1b, phi4-mini, gemma2:9b
+mode options: local, browser_copilot, hybrid, vision
+needs_screen: true only if task requires seeing the screen
 
 Rules:
-- Questions about the user's profile, projects, skills, experience → agent: "nlp", model: "gemma3:1b"
-- Complex analysis, scoring, structured reasoning → agent: "nlp", model: "phi4-mini"
-- Writing cover letters, posts, proposals → agent: "content", model: "gemma3:4b"
-- Browsing websites, scraping jobs → agent: "navigation", model: "gemma3:1b"
-- Storing/retrieving data, notes, memories → agent: "memory", model: "gemma3:1b"
-- Finding jobs, job search, show applications, job recommendations → agent: "jobs", model: "gemma3:1b"
+- Writing content (posts, letters, proposals, gigs, bios) → agent: "content", model: "gemma3:4b"
+- Questions about profile, skills, projects → agent: "nlp", model: "gemma3:1b"
+- Finding/searching jobs → agent: "jobs", model: "gemma3:1b"
+- Brand check, github activity, weekly posts → agent: "brand", model: "gemma3:1b"
+- Complex analysis, scoring → agent: "nlp", model: "phi4-mini"
+- Browsing websites → agent: "navigation", model: "gemma3:1b"
 
-Output ONLY the JSON object. No explanation, no markdown, no extra text. Just the raw JSON."""
+Output ONLY the JSON object."""
 
-
-SUPPORTED_AGENTS = {"nlp", "content", "navigation", "memory", "jobs"}
+SUPPORTED_AGENTS = {"nlp", "content", "navigation", "memory", "jobs", "brand", "github"}
 SUPPORTED_MODELS = {"gemma3:1b", "phi4-mini", "gemma3:4b", "gemma2:9b"}
 
 
@@ -50,81 +58,138 @@ def route_command(user_input: str) -> dict:
     """
     Route a user command to the appropriate agent via Gemma 3 1B.
     
-    Args:
-        user_input: Raw user command string
-        
     Returns:
-        dict with keys: agent, task, model
-        On failure: dict with agent="nlp", task="general", model="gemma3:1b"
+        dict with keys: agent, task, model, mode, needs_screen
     """
-    prompt = f"Classify this user command and output JSON:\n\n\"{user_input}\""
+    prompt = f'Classify this user command and output JSON:\n\n"{user_input}"'
     
     raw = safe_run(
         model=_get_routing_model(),
         prompt=prompt,
         required_gb=0.5,
-        system=ROUTER_SYSTEM_PROMPT
+        system=ROUTER_SYSTEM_PROMPT,
+        num_predict=150  # Routing JSON never needs more than 150 tokens
     )
     
     if raw.startswith("[ERROR]"):
         print(f"[ORCHESTRATOR] Model error: {raw}")
-        return _default_route()
+        return _default_route(user_input)
     
-    return _parse_routing(raw)
+    print(f"  [DEBUG RAW ORCHESTRATOR]: '{raw[:300]}'")
+    
+    result = _parse_routing(raw)
+    print(f"  [DEBUG PARSED ROUTING]: {json.dumps(result)}")
+    return result
 
 
 def _parse_routing(raw: str) -> dict:
-    """Extract JSON from model response, handling markdown fences and noise."""
-    text = raw.strip()
+    """
+    Robustly extract routing JSON from orchestrator response.
+    Uses 3 fallback strategies: direct parse → regex extraction → key-value extraction.
+    """
+    fallback = {
+        "agent": "content",
+        "task": "general",
+        "model": "gemma3:4b",
+        "mode": "local",
+        "needs_screen": False,
+    }
+    
+    if not raw or not raw.strip():
+        print("[ROUTING] Empty response from orchestrator — using fallback")
+        return fallback
     
     # Strip markdown code fences if present
-    if "```" in text:
-        lines = text.split("\n")
-        json_lines = []
-        inside = False
-        for line in lines:
-            if line.strip().startswith("```"):
-                inside = not inside
-                continue
-            if inside:
-                json_lines.append(line)
-        text = "\n".join(json_lines).strip()
+    cleaned = re.sub(r'```(?:json)?\s*', '', raw).strip()
+    cleaned = re.sub(r'```\s*$', '', cleaned).strip()
     
-    # Try to find JSON object in the response
-    start = text.find("{")
-    end = text.rfind("}") + 1
-    if start != -1 and end > start:
-        text = text[start:end]
-    
+    # Try 1: direct JSON parse
     try:
-        result = json.loads(text)
-        # Validate keys
-        if "agent" not in result:
-            result["agent"] = "nlp"
-        if "task" not in result:
-            result["task"] = "general"
-        if "model" not in result:
-            result["model"] = "gemma3:1b"
-        
-        # Validate values
-        if result["agent"] not in SUPPORTED_AGENTS:
-            result["agent"] = "nlp"
-        if result["model"] not in SUPPORTED_MODELS:
-            result["model"] = "gemma3:1b"
-            
-        return result
+        result = json.loads(cleaned)
+        return _validate_routing(result)
     except (json.JSONDecodeError, TypeError):
-        print(f"[ORCHESTRATOR] Failed to parse JSON from: {raw[:200]}")
-        return _default_route()
-
-
-def _default_route() -> dict:
-    """Fallback routing when parsing fails."""
-    return {
-        "agent": "nlp",
-        "task": "general",
-        "model": "gemma3:1b"
+        pass
+    
+    # Try 2: find JSON object anywhere in the text
+    match = re.search(r'\{[^{}]*\}', cleaned, re.DOTALL)
+    if match:
+        try:
+            result = json.loads(match.group())
+            return _validate_routing(result)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    
+    # Try 3: extract key-value pairs manually with regex
+    result = {}
+    patterns = {
+        "agent": r'"agent"\s*:\s*"([^"]+)"',
+        "task": r'"task"\s*:\s*"([^"]+)"',
+        "model": r'"model"\s*:\s*"([^"]+)"',
+        "mode": r'"mode"\s*:\s*"([^"]+)"',
+        "needs_screen": r'"needs_screen"\s*:\s*(true|false)',
     }
+    for key, pattern in patterns.items():
+        m = re.search(pattern, raw, re.IGNORECASE)
+        if m:
+            val = m.group(1)
+            if val.lower() == "true":
+                val = True
+            elif val.lower() == "false":
+                val = False
+            result[key] = val
+    
+    if result.get("agent"):
+        print(f"[ROUTING] Partial parse succeeded: {result}")
+        merged = {**fallback, **result}
+        return _validate_routing(merged)
+    
+    print(f"[ROUTING] All parsing failed. Raw was: '{raw[:200]}'. Using fallback.")
+    return fallback
+
+
+def _validate_routing(result: dict) -> dict:
+    """Validate and correct routing dict fields."""
+    # Ensure all keys exist
+    result.setdefault("agent", "content")
+    result.setdefault("task", "general")
+    result.setdefault("model", "gemma3:4b")
+    result.setdefault("mode", "local")
+    result.setdefault("needs_screen", False)
+    
+    # Validate agent
+    if result["agent"] not in SUPPORTED_AGENTS:
+        result["agent"] = "content"
+    
+    # Validate model
+    if result["model"] not in SUPPORTED_MODELS:
+        result["model"] = "gemma3:4b"  # Default to content model, NOT router
+    
+    # Content agent should always use gemma3:4b
+    if result["agent"] == "content" and result["model"] == "gemma3:1b":
+        result["model"] = "gemma3:4b"
+    
+    return result
+
+
+def _default_route(user_input: str = "") -> dict:
+    """Fallback routing when parsing fails or orchestrator errors.
+    Uses keyword matching to make a best-effort guess."""
+    lower = user_input.lower() if user_input else ""
+    
+    # Content detection
+    if any(kw in lower for kw in ["write", "post", "letter", "cover", "gig", "proposal", "bio", "generate"]):
+        return {"agent": "content", "task": "general", "model": "gemma3:4b", "mode": "local", "needs_screen": False}
+    
+    # Job detection
+    if any(kw in lower for kw in ["job", "search", "find", "apply", "application"]):
+        return {"agent": "jobs", "task": "search", "model": "gemma3:1b", "mode": "local", "needs_screen": False}
+    
+    # Brand detection
+    if any(kw in lower for kw in ["brand", "github", "activity", "weekly"]):
+        return {"agent": "brand", "task": "check", "model": "gemma3:1b", "mode": "local", "needs_screen": False}
+    
+    # Default: NLP analysis with 1B
+    return {"agent": "nlp", "task": "general", "model": "gemma3:1b", "mode": "local", "needs_screen": False}
 
 
 if __name__ == "__main__":
@@ -136,8 +201,9 @@ if __name__ == "__main__":
     test_commands = [
         "what are my projects and tech stacks",
         "write a cover letter for a Python job",
+        "write a linkedin post about basepy-sdk",
         "browse LinkedIn for AI jobs",
-        "save this note: meeting at 3pm",
+        "brand check",
     ]
     
     for cmd in test_commands:
