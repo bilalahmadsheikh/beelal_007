@@ -101,49 +101,44 @@ class LinkedInPoster:
 
     def _launch_with_existing_profile(self) -> bool:
         """
-        Launch Playwright using the user's real Chrome profile directory.
-        LinkedIn session cookies are already present — no login needed.
-        Chrome must be fully closed before calling this (profile lock).
-        Returns True on success.
+        Launch Chrome using the configured profile (Default / ba8516127@gmail.com).
+        LinkedIn session is already active in that profile — no login needed.
+        Chrome must be fully closed before this runs (profile lock).
         """
         from playwright.sync_api import sync_playwright
+        from tools.chrome_profile import get_profile_path, get_chrome_exe, get_extension_path
 
-        profile_path = _get_chrome_profile_path()
-        chrome_exe   = _get_chrome_executable()
-
-        if not profile_path:
-            raise RuntimeError(
-                "Chrome profile directory not found. "
-                "Is Chrome installed at a standard path?"
-            )
+        profile_path = get_profile_path()
+        chrome_exe   = get_chrome_exe()
+        ext_path     = get_extension_path()
 
         print(f"  [CHROME] Profile : {profile_path}")
         print(f"  [CHROME] Exe     : {chrome_exe}")
 
         self._pw = sync_playwright().__enter__()
 
-        # launch_persistent_context keeps all cookies, localStorage, sessions
+        # launch_persistent_context uses the real profile —
+        # all cookies, localStorage, and LinkedIn session are preserved
         self.context = self._pw.chromium.launch_persistent_context(
-            user_data_dir=profile_path,
-            executable_path=chrome_exe,
-            headless=False,
-            args=[
+            user_data_dir   = profile_path,
+            executable_path = chrome_exe,
+            headless        = False,
+            args            = [
                 "--disable-blink-features=AutomationControlled",
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
-                # Load the BilalAgent extension so permission overlays work in Chrome
-                f"--disable-extensions-except={EXTENSION_DIR}",
-                f"--load-extension={EXTENSION_DIR}",
+                f"--disable-extensions-except={ext_path}",
+                f"--load-extension={ext_path}",
+                "--start-maximized",
             ],
-            ignore_default_args=["--enable-automation"],
-            viewport={"width": 1280, "height": 800},
-            slow_mo=50,
+            ignore_default_args = ["--enable-automation"],
+            slow_mo             = 40,
         )
 
-        pages = self.context.pages
+        pages     = self.context.pages
         self.page = pages[0] if pages else self.context.new_page()
-        print("  [CHROME] ✓ Launched with your Chrome profile")
-        print("  [CHROME] ✓ Extension loaded")
+        print("  [CHROME] ✓ Launched with Default profile (ba8516127@gmail.com)")
+        print("  [CHROME] ✓ LinkedIn session should be active")
         return True
 
     # ── Bridge helpers ────────────────────────────────

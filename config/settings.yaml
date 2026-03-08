@@ -27,6 +27,12 @@ post_days:
 post_time: 09:00
 github_check_hours: 24
 bridge_port: 8000
+chrome:
+  profile_name: "Person 1"
+  profile_email: "ba8516127@gmail.com"
+  profile_folder: "Default"
+  user_data_dir: "%LOCALAPPDATA%\\Google\\Chrome\\User Data"
+  executable: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
 scheduler:
   mode: local
   post_day: monday
