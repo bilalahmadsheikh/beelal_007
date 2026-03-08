@@ -40,6 +40,35 @@
 - **Agent**: `python agent.py --overlay` launches desktop overlay instead of CLI
 - **Dashboard**: Command tab with live agent prompt (from Phase 11)
 
+## New in v3.0 Build (Steps 1-5 Complete)
+- **agent.py**: Full argparse — `--overlay` (PyQt5 GUI), `--bridge` (FastAPI :8000), positional command
+- **Phi-4 Mini**: `microsoft_Phi-4-mini-instruct-Q4_K_S.gguf` at `D:\local_models\bartowski\microsoft_Phi-4-mini-instruct-GGUF\`
+- **LlamaCppServer** (`tools/uitars_server.py`): Generic multi-model server manager replacing UITARSServer
+  - `MODEL_REGISTRY`: uitars-2b (port 8081), uitars-7b (port 8081), phi4-mini (port 8082)
+  - `_find_phi4_gguf()`: auto-detects best quantization in Phi-4 dir
+  - `get_llamacpp_server()`: singleton accessor
+- **LinkedIn Poster** (`tools/linkedin_poster.py`): Full Playwright flow with 3 permission gates
+  - Permission 1: open browser → Permission 2: type post → Permission 3: click Post
+  - Extension confirmation via `/extension/page_state` (waits for `post_confirmed` state)
+  - Logs to `linkedin_posts.xlsx` + SQLite after posting
+  - Upload triggered by keywords: "upload / post to linkedin / write and upload / go live"
+- **Task Coordinator** (`tools/task_coordinator.py`): Unified task runner for overlay + agent pipeline
+  - `TaskCoordinator.run(user_input)` → detect intent → generate → execute → report
+  - `set_overlay_callback(fn)` for live status to desktop overlay
+  - `get_coordinator()` singleton
+- **Bridge v3** (`bridge/server.py`): New endpoints added
+  - `GET /status` — health check (extension polls on load)
+  - `POST /tasks/register`, `GET /tasks/active`, `POST /tasks/complete`, `GET /tasks/status/{id}`
+  - `POST /extension/page_state`, `GET /extension/page_state/{task_id}`
+- **Chrome Extension** (`chrome_extension/content_script.js`): LinkedIn watcher added
+  - `pollActiveTasks()` — watches bridge for active linkedin_post tasks (every 2s)
+  - `watchLinkedInPage(taskId)` — MutationObserver reports `page_loaded`, `composer_open`, `post_confirmed`
+  - `checkBridge()` — liveness gate on `GET /status` (every 5s), gates all polling
+- **Word Count Enforcement** (`tools/content_tools.py`): Hard 180-320 word enforcement
+  - Auto-trims posts > 320 words via LLM call; auto-expands posts < 180 words
+  - Auto-logs every generated LinkedIn post to Excel + SQLite
+- **excel_logger** (`memory/excel_logger.py`): `log_linkedin_post()` added as wrapper over `log_post()`
+
 ## Rules
 - All files in D:\beelal_007\
 - Models served via Ollama (ollama pull gemma3:1b, ollama pull gemma3:4b)

@@ -382,6 +382,86 @@ phase_scores["10"] = passed - p10_start
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  PHASE 12: v3.0 — Desktop Overlay, Phi-4, LinkedIn Poster, Task Coordinator
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+header("12", "v3.0 — Phi-4, LinkedIn Poster, Task Coordinator, Bridge v3")
+p12_start = passed
+
+# LlamaCppServer + Phi-4
+try:
+    from tools.uitars_server import LlamaCppServer, MODEL_REGISTRY, _find_phi4_gguf
+    s = LlamaCppServer()
+    test("P12 LlamaCppServer imports", True)
+    test("P12 MODEL_REGISTRY has phi4-mini", "phi4-mini" in MODEL_REGISTRY)
+    test("P12 MODEL_REGISTRY has uitars-2b", "uitars-2b" in MODEL_REGISTRY)
+    phi4 = _find_phi4_gguf()
+    test("P12 Phi-4 GGUF detected", phi4 is not None, "Not found")
+    test("P12 Phi-4 GGUF file exists", phi4 is not None and os.path.exists(phi4))
+    test("P12 LlamaCppServer.get_status() works", isinstance(s.get_status(), dict))
+except Exception as e:
+    test("P12 LlamaCppServer", False, str(e))
+
+# LinkedIn Poster
+try:
+    from tools.linkedin_poster import LinkedInPoster
+    test("P12 LinkedInPoster imports", True)
+    test("P12 LinkedInPoster has post()", hasattr(LinkedInPoster, "post"))
+except Exception as e:
+    test("P12 LinkedInPoster", False, str(e))
+
+# Task Coordinator
+try:
+    from tools.task_coordinator import TaskCoordinator, get_coordinator, Task
+    coord = TaskCoordinator()
+    test("P12 TaskCoordinator imports", True)
+    test("P12 get_coordinator() singleton", get_coordinator() is get_coordinator())
+    t = Task("test input")
+    test("P12 Task has id/status/steps", hasattr(t, "id") and hasattr(t, "steps"))
+    coord.set_overlay_callback(lambda m, tp: None)
+    test("P12 set_overlay_callback works", coord._overlay_cb is not None)
+except Exception as e:
+    test("P12 TaskCoordinator", False, str(e))
+
+# Bridge v3 endpoints
+try:
+    from bridge.server import app
+    routes = [r.path for r in app.routes]
+    test("P12 /status endpoint", "/status" in routes)
+    test("P12 /tasks/register endpoint", "/tasks/register" in routes)
+    test("P12 /tasks/active endpoint", "/tasks/active" in routes)
+    test("P12 /tasks/complete endpoint", "/tasks/complete" in routes)
+    test("P12 /extension/page_state POST", "/extension/page_state" in routes)
+    test("P12 /route endpoint", "/route" in routes)
+except Exception as e:
+    test("P12 Bridge v3 endpoints", False, str(e))
+
+# excel_logger log_linkedin_post
+try:
+    from memory.excel_logger import log_linkedin_post, log_post, get_posts
+    test("P12 log_linkedin_post exists", True)
+    test("P12 log_post exists", True)
+except Exception as e:
+    test("P12 excel_logger v3", False, str(e))
+
+# agent.py argparse
+with open(os.path.join(PROJECT_ROOT, "agent.py"), "r", encoding="utf-8") as f:
+    agent_v3 = f.read()
+test("P12 --overlay argparse", "add_argument" in agent_v3 and "--overlay" in agent_v3)
+test("P12 --bridge argparse", "--bridge" in agent_v3)
+test("P12 upload trigger in agent", "write and upload" in agent_v3)
+
+# content_script.js LinkedIn watcher
+with open(os.path.join(PROJECT_ROOT, "chrome_extension", "content_script.js"), "r", encoding="utf-8") as f:
+    js_v3 = f.read()
+test("P12 pollActiveTasks in extension", "pollActiveTasks" in js_v3)
+test("P12 watchLinkedInPage in extension", "watchLinkedInPage" in js_v3)
+test("P12 post_confirmed state in extension", "post_confirmed" in js_v3)
+test("P12 checkBridge in extension", "checkBridge" in js_v3)
+
+phase_scores["12"] = passed - p12_start
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  FILE COUNT
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 header("FILES", "Project File Count")

@@ -390,7 +390,57 @@ Post:"""
     # Ensure hashtags are present
     if "#" not in result:
         result += f"\n\n#OpenSource #GitHub #WebDev #BuildInPublic"
-    
+
+    # ── Word count enforcement (180-320 words) ────────
+    words = len(result.split())
+    if words > 320:
+        print(f"  [WORDCOUNT] {words} words — trimming...")
+        trim_prompt = (
+            f"Trim this LinkedIn post to under 300 words. "
+            f"Keep all key technical facts and numbers. "
+            f"Return ONLY the trimmed post, no commentary:\n\n{result}"
+        )
+        from agents.content_agent import generate as _gen2
+        trimmed = _gen2(trim_prompt, content_type="linkedin_trim")
+        trimmed = _clean_post(trimmed, project_name)
+        if 100 < len(trimmed.split()) < 350:
+            result = trimmed
+            print(f"  [WORDCOUNT] Trimmed to {len(result.split())} words")
+    elif words < 180:
+        print(f"  [WORDCOUNT] {words} words — too short, expanding...")
+        expand_prompt = prompt + (
+            "\n\nIMPORTANT: The post must be 200-280 words. Expand the technical details."
+        )
+        from agents.content_agent import generate as _gen3
+        expanded = _gen3(expand_prompt, content_type="linkedin_expand")
+        expanded = _clean_post(expanded, project_name)
+        if len(expanded.split()) >= 180:
+            result = expanded
+
+    # ── Log to Excel + SQLite ─────────────────────────
+    try:
+        from memory.excel_logger import log_linkedin_post
+        log_linkedin_post(
+            content=result,
+            platform="linkedin",
+            repo=project_name,
+            word_count=len(result.split()),
+            status="generated",
+        )
+    except Exception as _e:
+        print(f"  [LOG] Excel save failed: {_e}")
+
+    try:
+        from memory.db import log_action
+        log_action("content_generated", {
+            "type": "linkedin_post",
+            "repo": project_name,
+            "words": len(result.split()),
+            "task": user_request[:100],
+        }, "completed")
+    except Exception as _e:
+        print(f"  [LOG] SQLite save failed: {_e}")
+
     return result
 
 

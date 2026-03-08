@@ -428,6 +428,24 @@ def log_post(post_type: str, preview: str, status: str = "pending_approval",
     print(f"[EXCEL] Logged post: [{post_type}] {preview[:50]}... ({status})")
 
 
+def log_linkedin_post(content: str, platform: str = "linkedin",
+                      repo: str = "", word_count: int = 0,
+                      status: str = "generated", model_used: str = "",
+                      posted_at: str = "") -> None:
+    """
+    Alias for log_post — logs a LinkedIn post to linkedin_posts.xlsx.
+    Called after content generation and after live posting.
+    """
+    preview = content[:100].replace("\n", " ")
+    log_post(
+        post_type="project_showcase",
+        preview=preview,
+        status=status,
+        url=posted_at,      # repurpose url field for posted_at timestamp
+        mode=model_used or "local",
+    )
+
+
 def get_posts(status: str = None) -> list:
     """Get logged LinkedIn posts from Excel."""
     from openpyxl import load_workbook

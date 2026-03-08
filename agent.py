@@ -268,6 +268,27 @@ def _handle_content(user_input: str, task: str) -> str | dict:
         print(f"  → LinkedIn post about: {parsed['project_name']}")
         result = generate_linkedin_post(parsed["project_name"], parsed.get("post_type", "project_showcase"), user_request=user_input)
         log_content("linkedin_post", result, "generated", "linkedin")
+
+        # Upload trigger — if user asked to post/upload/publish live
+        upload_triggers = [
+            "upload", "post to linkedin", "publish",
+            "share on linkedin", "write and upload", "write and post",
+            "post it", "go live",
+        ]
+        if any(t in user_input.lower() for t in upload_triggers):
+            print(f"\n  [UPLOAD] Upload requested — launching LinkedIn poster")
+            try:
+                from tools.linkedin_poster import LinkedInPoster
+                up_result = LinkedInPoster().post(content=result, source_task=user_input)
+                if up_result["status"] == "posted":
+                    print(f"  LIVE ON LINKEDIN — posted at {up_result['posted_at']}")
+                elif up_result["status"] == "cancelled":
+                    print(f"  [UPLOAD] Cancelled: {up_result['reason']}")
+                else:
+                    print(f"  [UPLOAD] Failed: {up_result['reason']}")
+            except Exception as _ue:
+                print(f"  [UPLOAD] Error: {_ue}")
+
         return result
     
     elif parsed and parsed["content_type"] == "cover_letter":
@@ -556,20 +577,39 @@ def _parse_job_query(user_input: str) -> tuple:
 
 def main():
     """Main entry point."""
-    # Phase 12: --overlay launches the PyQt5 desktop overlay instead of CLI
-    if "--overlay" in sys.argv:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="BilalAgent v3.0")
+    parser.add_argument("command", nargs="?", default=None,
+                        help="Command to run (omit for interactive mode)")
+    parser.add_argument("--overlay", action="store_true",
+                        help="Launch desktop overlay GUI")
+    parser.add_argument("--bridge", action="store_true",
+                        help="Start FastAPI bridge only (port 8000)")
+    args, extra = parser.parse_known_args()
+
+    if args.overlay:
         from ui.desktop_overlay import main as overlay_main
         overlay_main()
         return
 
+    if args.bridge:
+        import uvicorn
+        uvicorn.run("bridge.server:app", host="127.0.0.1",
+                    port=8000, reload=False, log_level="info")
+        return
+
     profile = startup()
-    
-    if len(sys.argv) > 1:
-        user_input = " ".join(sys.argv[1:])
-        handle_command(user_input, profile)
+
+    # Reassemble command from positional arg + any extra tokens
+    raw_cmd = " ".join(filter(None, [args.command] + extra)).strip()
+
+    if raw_cmd:
+        handle_command(raw_cmd, profile)
     else:
         print("\nUsage: python agent.py \"your command here\"")
         print("       python agent.py --overlay  (launches desktop overlay)")
+        print("       python agent.py --bridge   (starts FastAPI bridge on :8000)")
         print("\nExamples:")
         print('  python agent.py "what are my 4 projects and their tech stacks"')
         print('  python agent.py "write a linkedin post about purchasing_power_ml"')

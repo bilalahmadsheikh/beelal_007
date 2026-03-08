@@ -78,7 +78,13 @@ def _get_conn():
 
 @app.get("/")
 async def root():
-    return {"status": "running", "agent": "BilalAgent v2.0", "bridge": "active"}
+    return {"status": "running", "agent": "BilalAgent v3.0", "bridge": "active"}
+
+
+@app.get("/status")
+async def status():
+    """Health check — extension polls this at startup."""
+    return {"status": "ok", "bridge": "BilalAgent", "version": "3.0"}
 
 
 @app.post("/extension/context_snap")
@@ -379,6 +385,75 @@ async def allow_all_status():
         "expires_at": server_allow_all_expires if server_allow_all else 0,
         "time_remaining_seconds": remaining,
     }
+
+
+# ─── Phase 12: Task Tracking Endpoints ──────────────
+
+# In-memory task registry (key: task_id)
+active_tasks: dict = {}
+page_states: dict = {}
+
+
+class TaskBody(BaseModel):
+    task_id: str
+    type: str = "generic"
+    content_preview: str = ""
+    status: str = "active"
+
+
+class TaskComplete(BaseModel):
+    task_id: str
+    status: str = "completed"
+    posted_at: str = ""
+
+
+class PageStateBody(BaseModel):
+    task_id: str
+    state: str
+    url: str = ""
+    ts: int = 0
+
+
+@app.post("/tasks/register")
+async def tasks_register(body: TaskBody):
+    active_tasks[body.task_id] = {
+        **body.model_dump(),
+        "registered_at": _time.time(),
+    }
+    print(f"[BRIDGE] Task registered: {body.task_id} ({body.type})")
+    return {"status": "registered", "task_id": body.task_id}
+
+
+@app.get("/tasks/active")
+async def tasks_active():
+    return list(active_tasks.values())
+
+
+@app.post("/tasks/complete")
+async def tasks_complete(body: TaskComplete):
+    if body.task_id in active_tasks:
+        active_tasks[body.task_id].update({
+            **body.model_dump(),
+            "completed_at": _time.time(),
+        })
+    return {"status": "ok"}
+
+
+@app.get("/tasks/status/{task_id}")
+async def task_status(task_id: str):
+    return active_tasks.get(task_id, {"status": "not_found"})
+
+
+@app.post("/extension/page_state")
+async def report_page_state(body: PageStateBody):
+    page_states[body.task_id] = {**body.model_dump(), "reported_at": _time.time()}
+    print(f"[EXTENSION] {body.task_id}: {body.state}")
+    return {"status": "ok"}
+
+
+@app.get("/extension/page_state/{task_id}")
+async def get_page_state(task_id: str):
+    return page_states.get(task_id, {"state": "unknown"})
 
 
 # ─── Phase 12: Route Endpoint ───────────────────────

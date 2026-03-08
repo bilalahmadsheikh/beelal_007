@@ -285,6 +285,195 @@ def get_server() -> UITARSServer:
     return _server_instance
 
 
+# ═══════════════════════════════════════════════════════
+#  LlamaCppServer — generic multi-model server manager
+#  Supports UI-TARS (vision) and Phi-4-mini (text) models
+# ═══════════════════════════════════════════════════════
+
+MODEL_REGISTRY = {
+    "uitars-2b": {
+        "model":    r"D:\local_models\bartowski\UI-TARS-2B-SFT-GGUF\UI-TARS-2B-SFT-Q4_K_S.gguf",
+        "mmproj":   r"D:\local_models\bartowski\UI-TARS-2B-SFT-GGUF\mmproj-UI-TARS-2B-SFT-f16.gguf",
+        "port":     8081,
+        "ctx_size": 4096,
+        "ram_gb":   2.5,
+        "vision":   True,
+    },
+    "uitars-7b": {
+        "model":    r"D:\local_models\bartowski\UI-TARS-7B-SFT-GGUF\UI-TARS-7B-SFT-Q4_K_S.gguf",
+        "mmproj":   r"D:\local_models\bartowski\UI-TARS-7B-SFT-GGUF\mmproj-UI-TARS-7B-SFT-f16.gguf",
+        "port":     8081,
+        "ctx_size": 4096,
+        "ram_gb":   5.5,
+        "vision":   True,
+    },
+    "phi4-mini": {
+        "model":    None,   # auto-detected at runtime
+        "mmproj":   None,
+        "port":     8082,
+        "ctx_size": 4096,
+        "ram_gb":   2.5,
+        "vision":   False,
+    },
+}
+
+_PHI4_DIR = r"D:\local_models\bartowski\microsoft_Phi-4-mini-instruct-GGUF"
+
+
+def _find_phi4_gguf() -> str | None:
+    """Find best Phi-4-mini GGUF in the expected directory."""
+    if not os.path.isdir(_PHI4_DIR):
+        return None
+    files = [f for f in os.listdir(_PHI4_DIR) if f.endswith(".gguf")]
+    for pref in ["Q4_K_M", "Q4_K_S", "Q4", "Q3_K_M", "Q2_K"]:
+        for f in files:
+            if pref in f:
+                return os.path.join(_PHI4_DIR, f)
+    return os.path.join(_PHI4_DIR, files[0]) if files else None
+
+
+class LlamaCppServer:
+    """
+    Generic llama.cpp server manager.
+    Supports UI-TARS vision models (ports 8081) and Phi-4-mini text model (port 8082).
+
+    Usage:
+        s = LlamaCppServer()
+        s.start("phi4-mini")    # Phi-4 on port 8082
+        s.start("uitars-2b")    # UI-TARS 2B on port 8081
+        s.stop("phi4-mini")
+        s.get_status()
+    """
+
+    SERVER_EXE = r"D:\local_models\llama.cpp\llama-server.exe"
+
+    def __init__(self):
+        self.processes: dict = {}        # model_key -> subprocess.Popen
+        self._log_dir = os.path.join(PROJECT_ROOT, "memory")
+
+    def start(self, model_key: str = "uitars-2b") -> bool:
+        """Start a model server. Polls /health until ready (up to 120s)."""
+        if model_key not in MODEL_REGISTRY:
+            log.error(f"[LlamaCpp] Unknown model key: {model_key}")
+            return False
+
+        config = MODEL_REGISTRY[model_key].copy()
+
+        # Auto-detect Phi-4 path
+        if model_key == "phi4-mini":
+            config["model"] = _find_phi4_gguf()
+            if not config["model"]:
+                log.error(f"[LlamaCpp] Phi-4 GGUF not found in {_PHI4_DIR}")
+                return False
+
+        if not os.path.exists(self.SERVER_EXE):
+            log.error(f"[LlamaCpp] llama-server.exe not found: {self.SERVER_EXE}")
+            return False
+
+        if not os.path.exists(config["model"]):
+            log.error(f"[LlamaCpp] Model not found: {config['model']}")
+            return False
+
+        # Stop existing process for this key if running
+        if model_key in self.processes:
+            self.stop(model_key)
+
+        port = config["port"]
+        log_path = os.path.join(self._log_dir,
+                                f"llama_{model_key.replace('-', '_')}.log")
+
+        cmd = [
+            self.SERVER_EXE,
+            "-m", config["model"],
+            "--port", str(port),
+            "--ctx-size", str(config["ctx_size"]),
+            "-ngl", "0",            # CPU-only — no GPU on MagicBook 16
+            "--host", "127.0.0.1",
+            "--log-disable",
+        ]
+        if config.get("mmproj"):
+            cmd += ["--mmproj", config["mmproj"]]
+
+        log.info(f"[LlamaCpp] Starting {model_key} on port {port}...")
+        log.info(f"[LlamaCpp] Model: {os.path.basename(config['model'])}")
+
+        try:
+            with open(log_path, "w", encoding="utf-8") as log_f:
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=log_f,
+                    stderr=log_f,
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                        if sys.platform == "win32" else 0,
+                )
+            self.processes[model_key] = proc
+        except Exception as e:
+            log.error(f"[LlamaCpp] Failed to launch: {e}")
+            return False
+
+        # Poll /health for up to 120 seconds
+        health_url = f"http://127.0.0.1:{port}/health"
+        for i in range(60):
+            time.sleep(2)
+            if proc.poll() is not None:
+                log.error(f"[LlamaCpp] Process exited early — check {log_path}")
+                self.processes.pop(model_key, None)
+                return False
+            try:
+                r = requests.get(health_url, timeout=2)
+                if r.status_code == 200:
+                    log.info(f"[LlamaCpp] {model_key} ready on port {port} ({(i+1)*2}s)")
+                    return True
+            except Exception:
+                pass
+
+        log.error(f"[LlamaCpp] Timeout waiting for {model_key}. Check {log_path}")
+        self.stop(model_key)
+        return False
+
+    def stop(self, model_key: str = None):
+        """Stop one or all model servers."""
+        keys = [model_key] if model_key else list(self.processes.keys())
+        for key in keys:
+            proc = self.processes.pop(key, None)
+            if proc:
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=10)
+                except Exception:
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                log.info(f"[LlamaCpp] {key} stopped")
+
+    def is_running(self, model_key: str = "uitars-2b") -> bool:
+        """Check if a model server is healthy on its port."""
+        config = MODEL_REGISTRY.get(model_key, {})
+        port = config.get("port", 8081)
+        try:
+            r = requests.get(f"http://127.0.0.1:{port}/health", timeout=2)
+            return r.status_code == 200
+        except Exception:
+            return False
+
+    def get_status(self) -> dict:
+        """Return running state for all registered models."""
+        return {key: self.is_running(key) for key in MODEL_REGISTRY}
+
+
+# Module-level singleton
+_llamacpp_instance: LlamaCppServer | None = None
+
+
+def get_llamacpp_server() -> LlamaCppServer:
+    """Get or create the singleton LlamaCppServer instance."""
+    global _llamacpp_instance
+    if _llamacpp_instance is None:
+        _llamacpp_instance = LlamaCppServer()
+    return _llamacpp_instance
+
+
 if __name__ == "__main__":
     print("=" * 50)
     print("UI-TARS Server Test")

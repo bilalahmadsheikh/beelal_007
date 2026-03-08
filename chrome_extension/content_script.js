@@ -556,5 +556,83 @@
     // Start permission polling alongside existing features
     startPermissionPolling();
 
-    console.log('[BilalAgent] Content script loaded (with Permission Gate)');
+    // ─── Feature 5: LinkedIn Task Watcher ────────────
+
+    let watchingLinkedIn = false;
+
+    async function pollActiveTasks() {
+        if (!bridgeAlive) return;
+        try {
+            const r = await fetch(`${BRIDGE_URL}/tasks/active`);
+            if (!r.ok) return;
+            const tasks = await r.json();
+            for (const task of tasks) {
+                if (task.status === 'active' &&
+                    task.type === 'linkedin_post' &&
+                    window.location.href.includes('linkedin.com') &&
+                    !watchingLinkedIn) {
+                    watchingLinkedIn = true;
+                    watchLinkedInPage(task.task_id);
+                }
+            }
+        } catch (e) {}
+    }
+    setInterval(pollActiveTasks, 2000);
+
+    function watchLinkedInPage(taskId) {
+        const reportState = (state) => {
+            fetch(`${BRIDGE_URL}/extension/page_state`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    task_id: taskId,
+                    state: state,
+                    url: window.location.href,
+                    ts: Date.now()
+                })
+            }).catch(() => {});
+            console.log(`[BilalAgent] LinkedIn state: ${state}`);
+        };
+
+        const observer = new MutationObserver(() => {
+            // Composer opened
+            const composer = document.querySelector(
+                'div.ql-editor, ' +
+                'div[data-placeholder="What do you want to talk about?"], ' +
+                'div.share-creation-state__text-editor div[contenteditable="true"]'
+            );
+            if (composer) reportState('composer_open');
+
+            // Post confirmed (success toast)
+            const toast = document.querySelector(
+                '.artdeco-toast-item--visible, ' +
+                '[data-test-artdeco-toast-type="success"]'
+            );
+            if (toast && toast.textContent.toLowerCase().includes('post')) {
+                reportState('post_confirmed');
+                observer.disconnect();
+                watchingLinkedIn = false;
+            }
+        });
+
+        observer.observe(document.body, { childList: true, subtree: true });
+        reportState('page_loaded');
+    }
+
+    // Bridge liveness check (gates pollActiveTasks + pollPermissions)
+    async function checkBridge() {
+        try {
+            const r = await fetch(`${BRIDGE_URL}/status`,
+                                  { signal: AbortSignal.timeout(2000) });
+            bridgeAlive = r.ok;
+        } catch (e) {
+            bridgeAlive = false;
+        }
+    }
+    // bridgeAlive flag already declared above; set initial value
+    let bridgeAlive = true;
+    setInterval(checkBridge, 5000);
+    checkBridge();
+
+    console.log('[BilalAgent] Content script loaded (Permission Gate + LinkedIn Watcher)');
 })();
