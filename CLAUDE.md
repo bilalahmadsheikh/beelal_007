@@ -1,4 +1,4 @@
-# BilalAgent v3.0 — Personal AI Desktop Agent
+# BilalAgent v3.1 — Personal AI Desktop Agent
 
 ## About Bilal Ahmad Sheikh
 - GitHub: https://github.com/bilalahmadsheikh
@@ -13,7 +13,7 @@
 - IlmSeUrooj: University admission platform for Pakistani students (Next.js + Supabase).
 - And more... (20 repos total)
 
-## v3.0 Architecture (Phases 0-10 Complete)
+## v3.1 Architecture (Phases 0-12 Complete)
 - Orchestrator: Gemma 3 1B (always warm, keep_alive=5m, routes every command)
 - Content Primary: Gemma 3 4B (best 4B content model, same family as orchestrator)
 - Content Fallback: Gemma 2 9B (reliable, well-tested alternative)
@@ -23,28 +23,22 @@
 - Dynamic profile: All prompts read from config/profile.yaml (name, degree, GitHub)
 - User prompt passthrough: Full user input passed as user_request to all generators
 - Chrome Extension at D:\beelal_007\chrome_extension\ (Manifest V3)
-- FastAPI bridge at localhost:8000 (connects extension to Python, 14+ endpoints)
+- FastAPI bridge at localhost:8000 (connects extension to Python, 15+ endpoints)
 - Intelligence Modes: local / web_copilot / hybrid
-- Approval: Chrome Extension overlay (NOT Tkinter)
 - PermissionGate: Every UI-TARS/browser action requires explicit user permission
 - BrowserCopilot: Mode 2 full chain (extract context → draft prompt → fill Claude/ChatGPT → capture response)
-- Job Search: CDP + JobSpy multi-site scraping + profile scoring
-- Freelance Automation: Upwork RSS monitor + gig generator + proposal pipeline
-- LinkedIn Brand Engine: GitHub activity monitor + weekly post generation (3 modes)
-- Hybrid Refiner: Local draft (gemma3:4b) → Claude web UI polish via Playwright + extension
-- Background Scheduler: schedule lib (Monday 9am posts, hourly approved post checks)
-- Excel Tracking: applied_jobs.xlsx, gigs_created.xlsx, linkedin_posts.xlsx
+- Desktop Overlay: PyQt5 floating always-on-top window (replaces Chrome extension as primary UI)
 
-## New in v3.0 (Phases 8-10)
-- **UI-TARS Server** (`tools/uitars_server.py`): llama.cpp subprocess manager for vision model
-- **UI-TARS Runner** (`tools/uitars_runner.py`): Screenshot → vision API → action execution
-- **Screen Monitor** (`tools/screen_monitor.py`): Background thread, 2s interval cached screenshots
-- **Permission Gate** (`tools/permission_gate.py`): Allow All timer + skip types + bridge polling
-- **Browser Copilot** (`tools/browser_copilot.py`): Full-chain Mode 2 automation
-- **Bridge**: 6 new permission endpoints (/permission/request, /pending, /result, /set_allow_all)
-- **Extension**: Permission overlay (5 buttons, crosshair, Allow All badge)
-- **Dashboard**: UI-TARS section + Permission Controls
-- **Total files**: 55+
+## New in v3.1 (Phase 12)
+- **Desktop Overlay** (`ui/desktop_overlay.py`): Floating PyQt5 frameless window, always-on-top
+  - `AgentOverlay`: Main window — conversation area, input bar, status bar, draggable titlebar
+  - `PermissionPopup`: Cursor-positioned 5-button approval popup with confidence bar + countdown
+  - `ScreenAnnotation`: Full-screen transparent crosshair/region overlay for vision actions
+  - `AgentWorker`: QThread background agent execution with Qt signals
+- **Hotkeys**: Ctrl+Space (toggle), Ctrl+Shift+S (emergency stop), Ctrl+Shift+B (snap screen)
+- **Bridge**: POST /route endpoint for task classification via orchestrator
+- **Agent**: `python agent.py --overlay` launches desktop overlay instead of CLI
+- **Dashboard**: Command tab with live agent prompt (from Phase 11)
 
 ## Rules
 - All files in D:\beelal_007\
@@ -55,3 +49,4 @@
 - NEVER execute browser actions without PermissionGate approval
 - No paid APIs — free/local only
 - All model calls through safe_run() — never call Ollama directly
+

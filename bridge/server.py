@@ -379,3 +379,26 @@ async def allow_all_status():
         "expires_at": server_allow_all_expires if server_allow_all else 0,
         "time_remaining_seconds": remaining,
     }
+
+
+# ─── Phase 12: Route Endpoint ───────────────────────
+
+class RouteRequest(BaseModel):
+    task: str
+
+@app.post("/route")
+async def route_task(data: RouteRequest):
+    """Route a task through the orchestrator (gemma3:1b) to classify it."""
+    try:
+        from agents.orchestrator import route_command
+        result = route_command(data.task)
+        # Ensure expected fields
+        if isinstance(result, dict):
+            result.setdefault("needs_screen", False)
+            result.setdefault("mode", "local")
+            return result
+        return {"agent": "nlp", "model": "gemma3:1b", "mode": "local", "needs_screen": False}
+    except Exception as e:
+        return {"agent": "nlp", "model": "gemma3:1b", "mode": "local",
+                "needs_screen": False, "error": str(e)}
+

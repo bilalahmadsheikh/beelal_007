@@ -556,6 +556,12 @@ def _parse_job_query(user_input: str) -> tuple:
 
 def main():
     """Main entry point."""
+    # Phase 12: --overlay launches the PyQt5 desktop overlay instead of CLI
+    if "--overlay" in sys.argv:
+        from ui.desktop_overlay import main as overlay_main
+        overlay_main()
+        return
+
     profile = startup()
     
     if len(sys.argv) > 1:
@@ -563,6 +569,7 @@ def main():
         handle_command(user_input, profile)
     else:
         print("\nUsage: python agent.py \"your command here\"")
+        print("       python agent.py --overlay  (launches desktop overlay)")
         print("\nExamples:")
         print('  python agent.py "what are my 4 projects and their tech stacks"')
         print('  python agent.py "write a linkedin post about purchasing_power_ml"')
@@ -575,3 +582,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
