@@ -122,13 +122,25 @@ def generate(prompt: str, content_type: str = "general") -> str:
     fallback_model = settings.get("content_model_fallback", "gemma2:9b")
     router_model = settings.get("routing_model", "gemma3:1b")
     
-    # Step 1: Free RAM aggressively before loading the content model
-    free = _free_ram_for_specialist(2.0)
+    # Step 1: Unload orchestrator from RAM before loading content model
+    import requests as _requests
+    try:
+        _requests.post(
+            "http://localhost:11434/api/generate",
+            json={"model": "gemma3:1b", "prompt": "x", "stream": False,
+                  "options": {"num_predict": 1}, "keep_alive": 0},
+            timeout=10,
+        )
+    except Exception:
+        pass
+    time.sleep(2)
+    free = get_free_ram()
+    print(f"[RAM] gemma3:1b unloaded — {free:.1f}GB free for gemma3:4b")
     
     # Try primary model first (best quality)
-    if free >= 2.0:
+    if free >= 1.5:
         print(f"[CONTENT] Using {primary_model} (primary) — {free:.1f}GB free")
-        result = safe_run(primary_model, prompt, required_gb=1.5, system=system_prompt)
+        result = safe_run(primary_model, prompt, required_gb=1.0, system=system_prompt)
         
         if not result.startswith("[ERROR]") and len(result) > 100:
             force_unload(primary_model)  # Free RAM after generation

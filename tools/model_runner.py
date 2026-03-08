@@ -53,7 +53,7 @@ def _hash_system_prompt(system: str) -> str:
     return hashlib.md5(system.encode()).hexdigest()[:8] if system else ""
 
 
-def run_model(model: str, prompt: str, system: str = "", keep_alive: str = None, num_predict: int = None) -> str:
+def run_model(model: str, prompt: str, system: str = "", keep_alive: str = None, num_predict: int = None, options: dict = None) -> str:
     """
     Run an Ollama model with tiered keep_alive for KV caching.
     
@@ -64,6 +64,7 @@ def run_model(model: str, prompt: str, system: str = "", keep_alive: str = None,
         prompt: User prompt to send
         system: Optional system prompt (cached in KV when model stays loaded)
         keep_alive: Override keep_alive (uses tier default if None)
+        options: Full options dict (temperature, num_predict, stop, etc.)
         
     Returns:
         Generated text response as string
@@ -89,7 +90,10 @@ def run_model(model: str, prompt: str, system: str = "", keep_alive: str = None,
     }
     if system:
         payload["system"] = system
-    if num_predict:
+    # Build options: full dict takes priority, then num_predict as fallback
+    if options:
+        payload["options"] = dict(options)
+    elif num_predict:
         payload["options"] = {"num_predict": num_predict}
     
     # Log cache status
@@ -173,7 +177,7 @@ def get_free_ram() -> float:
     return mem.available / (1024 ** 3)
 
 
-def safe_run(model: str, prompt: str, required_gb: float = 2.0, system: str = "", num_predict: int = None) -> str:
+def safe_run(model: str, prompt: str, required_gb: float = 2.0, system: str = "", num_predict: int = None, options: dict = None) -> str:
     """
     Run a model only if enough RAM is available.
     Automatically unloads competing specialists before loading.
@@ -183,6 +187,7 @@ def safe_run(model: str, prompt: str, required_gb: float = 2.0, system: str = ""
         prompt: User prompt
         required_gb: Minimum free RAM in GB required to run
         system: Optional system prompt (cached for fast TTFT)
+        options: Full options dict (temperature, num_predict, stop, etc.)
         
     Returns:
         Generated text or error message if insufficient RAM
@@ -202,7 +207,7 @@ def safe_run(model: str, prompt: str, required_gb: float = 2.0, system: str = ""
             f"Need {required_gb:.1f}GB, only {free:.1f}GB free. "
             f"Close some apps and retry."
         )
-    return run_model(model, prompt, system, num_predict=num_predict)
+    return run_model(model, prompt, system, num_predict=num_predict, options=options)
 
 
 if __name__ == "__main__":

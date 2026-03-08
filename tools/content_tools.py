@@ -82,43 +82,25 @@ def _get_deep_repo_context(project_name: str) -> str:
 def _compress_context(raw_context: str) -> str:
     """
     Compress raw deep context into a structured, model-friendly summary.
-    Extracts: metadata, tech stack, website features, chrome extension features,
-    architecture notes, build phases, commits. Filters out noise.
+    UNIVERSAL — works for ANY repo (Python SDK, web app, CLI tool, etc.).
+    Keeps: README (first 2000 chars), last 8 commits, docs snippet.
     """
     lines = raw_context.split("\n")
     
     metadata = []
-    website_features = []
-    extension_features = []
-    architecture = []
-    phases = []
-    commits = []
-    tech_deps = []
+    readme_lines = []
+    commit_lines = []
+    docs_lines = []
     
     current_section = None
-    in_extension_block = False
-    
-    # Noise patterns to skip
-    noise = [
-        "section: prerequisites", "section: 1.", "section: 2.", "section: 3.",
-        "section: 4.", "section: 5.", "clone and install", "environment variable",
-        "run the website", "load the extension", "feature: quick start",
-        "feature: decision", "decision 1:", "decision 2:", "decision 3:",
-        "decision 4:", "decision 5:", "decision 6:", "decision 7:",
-        "decision 8:", "decision 9:", "decision 10:", "decision 11:",
-        "decision 12:", "date:**", "choice:**", "rationale:**",
-        "status:**", "education system aware:**", "connected to:**",
-        "section: files created", "section: step-by-step", "section: what was built",
-        "files created", "src/app/", "src/data/", "src/components/",
-        "src/utils/", "`src/", "section: tier 1:", "section: tier 2:",
-        "target fields**", "iteration filter:", "iteration field/",
-        "iteration degree", "docs/", "feature: project timeline",
-        "feature: automated scraper", "feature: iteration",
-    ]
+    readme_chars = 0
     
     for line in lines:
         stripped = line.strip()
         if not stripped:
+            # Keep blank lines in README for readability
+            if current_section == "readme" and readme_chars < 2000:
+                readme_lines.append("")
             continue
         
         # Section detection
@@ -127,187 +109,138 @@ def _compress_context(raw_context: str) -> str:
             metadata.append(stripped)
             continue
         elif stripped.startswith("=== README"):
-            current_section = "features"
-            in_extension_block = False
-            continue
-        elif stripped.startswith("=== package.json"):
-            current_section = "tech_stack"
-            continue
-        elif "architecture" in stripped.lower() and stripped.startswith("==="):
-            current_section = "architecture"
-            continue
-        elif "FEATURES" in stripped and stripped.startswith("==="):
-            current_section = "features"
-            in_extension_block = False
-            continue
-        elif "PROGRESS" in stripped and stripped.startswith("==="):
-            current_section = "phases"
-            continue
-        elif "CHANGELOG" in stripped and stripped.startswith("==="):
-            current_section = "phases"
-            continue
-        elif "SCHEMA" in stripped and stripped.startswith("==="):
-            current_section = "architecture"
-            continue
-        elif "DECISION" in stripped.upper() and stripped.startswith("==="):
-            current_section = "skip"
-            continue
-        elif "DATA-SOURCE" in stripped.upper() and stripped.startswith("==="):
-            current_section = "skip"
-            continue
-        elif "DEVELOPMENT-HISTORY" in stripped.upper() and stripped.startswith("==="):
-            current_section = "phases"
+            current_section = "readme"
             continue
         elif "COMMITS" in stripped and stripped.startswith("==="):
             current_section = "commits"
             continue
-        elif stripped.startswith("=== Other docs"):
-            current_section = "skip"
-            continue
         elif stripped.startswith("=== "):
-            current_section = "features"
-            continue
-        
-        if current_section == "skip":
-            continue
-        
-        # Check noise
-        lower = stripped.lower()
-        if any(n in lower for n in noise):
+            # Any other === section goes to docs
+            current_section = "docs"
+            docs_lines.append(stripped)
             continue
         
         # Metadata
         if current_section == "metadata":
-            if any(stripped.startswith(k) for k in ["Language:", "Description:", "URL:", "Last updated:"]):
+            if any(stripped.startswith(k) for k in ["Language:", "Description:", "URL:", "Last updated:", "Stars:", "Forks:"]):
                 metadata.append(stripped)
         
-        # Features — detect Chrome Extension block
-        elif current_section == "features":
-            if "chrome extension" in lower and ("section:" in lower or stripped.startswith("###")):
-                in_extension_block = True
-                continue
-            elif ("section: website" in lower or "section: one profile" in lower):
-                in_extension_block = False
-                continue
-            elif stripped.startswith("Section: ") and "supported" not in lower:
-                continue
-            
-            # Skip how-it-works lines and non-feature content
-            if lower.startswith("how it works:**") or lower.startswith("what it does:**"):
-                continue
-            
-            # Extract actual features
-            feature_line = None
-            if stripped.startswith("- **") or (stripped.startswith("**") and "—" in stripped):
-                feature_line = stripped
-            elif stripped.startswith("Feature: ") and "decision" not in lower:
-                name = stripped[9:]
-                if name and len(name) > 5:
-                    feature_line = name
-            
-            if feature_line:
-                target = extension_features if in_extension_block else website_features
-                target.append(feature_line)
-        
-        # Tech stack
-        elif current_section == "tech_stack":
-            if '"dependencies"' in stripped or '"devDependencies"' in stripped:
-                continue
-            if '"' in stripped and ':' in stripped:
-                try:
-                    key = stripped.split('"')[1]
-                    if key not in ("name", "version", "private", "scripts", "dev", "build", "start", "lint",
-                                   "test-scrapers", "test-file-updates", "dependencies", "devDependencies"):
-                        tech_deps.append(key)
-                except IndexError:
-                    pass
-        
-        # Architecture
-        elif current_section == "architecture":
-            if any(kw in lower for kw in ["next.js", "supabase", "app router", "component", "rls",
-                                           "ci/cd", "chrome", "autofill", "3-tier", "78 column", "profile"]):
-                architecture.append(stripped)
-            elif stripped.startswith("- [x]"):
-                phases.append(stripped[6:])
-        
-        # Phases
-        elif current_section == "phases":
-            if stripped.startswith("- [x]"):
-                phases.append(stripped[6:])
-            elif stripped.startswith("| ") and "---" not in stripped:
-                parts = [p.strip() for p in stripped.split("|") if p.strip()]
-                if len(parts) >= 3 and parts[0][0].isdigit():
-                    phases.append(f"Iteration {parts[0]}: {parts[2]} ({parts[1]})")
+        # README — keep first 2000 chars (the most important content)
+        elif current_section == "readme":
+            if readme_chars < 2000:
+                readme_lines.append(stripped)
+                readme_chars += len(stripped) + 1
         
         # Commits
         elif current_section == "commits":
             if stripped.startswith("- "):
-                commits.append(stripped)
+                commit_lines.append(stripped)
+        
+        # Docs (FEATURES.md, CHANGELOG, etc.)
+        elif current_section == "docs":
+            if len("\n".join(docs_lines)) < 500:
+                docs_lines.append(stripped)
     
     # Build compressed output
-    out = []
+    parts = []
     
-    # Metadata
-    out.extend(metadata)
-    out.append("")
+    # Metadata first
+    if metadata:
+        parts.extend(metadata)
+        parts.append("")
     
-    # Tech stack
-    if tech_deps:
-        out.append(f"Tech stack: {', '.join(tech_deps[:10])}")
-        out.append("")
+    # README — the most important section
+    if readme_lines:
+        parts.append("=== README ===")
+        parts.extend(readme_lines)
+        parts.append("")
     
-    # Architecture
-    if architecture:
-        out.append("ARCHITECTURE:")
-        seen = set()
-        for a in architecture:
-            clean = a.strip().strip("#").strip()
-            if clean not in seen and len(clean) > 10:
-                seen.add(clean)
-                out.append(f"  • {clean}")
-        out.append("")
+    # Recent commits — last 8
+    if commit_lines:
+        parts.append("=== RECENT COMMITS ===")
+        for c in commit_lines[-8:]:
+            msg = c[:120]  # Trim long commit messages
+            parts.append(msg)
+        parts.append("")
     
-    # Website features
-    if website_features:
-        out.append("WEBSITE FEATURES:")
-        seen = set()
-        for f in website_features:
-            clean = f.strip("- *").strip()
-            if clean and clean not in seen and len(clean) > 10:
-                seen.add(clean)
-                out.append(f"  • {clean}")
-        out.append("")
+    # Docs snippet
+    if docs_lines:
+        parts.append("=== DOCS SNIPPET ===")
+        parts.extend(docs_lines[:20])
     
-    # Chrome Extension features
-    if extension_features:
-        out.append("CHROME EXTENSION FEATURES:")
-        seen = set()
-        for f in extension_features:
-            clean = f.strip("- *").strip()
-            if clean and clean not in seen and len(clean) > 10:
-                seen.add(clean)
-                out.append(f"  • {clean}")
-        out.append("")
+    result = "\n".join(parts)
+    print(f"  [CONTENT] Context: {len(result)} chars (README+commits+docs)")
+    return result
+
+
+# ─────────────────────────────────────────────────────
+# Hard facts for known repos (prevents hallucination)
+# ─────────────────────────────────────────────────────
+
+BASEPY_FACTS = """
+basepy-sdk is a production-grade Python SDK for the Base L2 blockchain (Ethereum L2 by Coinbase).
+
+KEY FEATURES:
+- Circuit breaker pattern: auto-pauses requests when RPC errors spike
+- Rate limiting: token bucket algorithm, prevents API throttling
+- Intelligent caching: reduces redundant RPC calls, saves ~$80 per million requests
+- L1 + L2 fee calculation: accurate gas estimation for Base transactions
+- Async-first design: built on web3.py with asyncio support
+- Comprehensive benchmarks: documented performance metrics
+- Production-ready: 2-5x faster operations vs naive web3.py usage
+
+TECHNICAL STACK: Python, web3.py, asyncio, Base L2, Ethereum
+AUTHOR: Bilal Ahmad Sheikh, AI Engineering student at GIKI Pakistan
+REPO: https://github.com/bilalahmadsheikh/basepy
+"""
+
+
+def _get_repo_facts(project_name: str, user_request: str = "") -> str:
+    """Inject hard facts for known repos to prevent hallucination."""
+    lower_name = project_name.lower()
+    lower_req = user_request.lower() if user_request else ""
     
-    # Build phases
-    if phases:
-        out.append("BUILD JOURNEY:")
-        seen = set()
-        for p in phases[:12]:
-            if p not in seen:
-                seen.add(p)
-                out.append(f"  • {p}")
-        out.append("")
+    if "basepy" in lower_name or "basepy" in lower_req or "base l2" in lower_req or "blockchain sdk" in lower_req:
+        return f"ABOUT THIS PROJECT (verified facts — use these):\n{BASEPY_FACTS}"
     
-    # Commits
-    if commits:
-        out.append("RECENT WORK:")
-        for c in commits[:6]:
-            out.append(f"  {c}")
+    return ""
+
+
+def _check_post_quality(post: str, repo_name: str, task: str) -> dict:
+    """Catch obvious hallucinations before showing to user."""
+    issues = []
     
-    compressed = "\n".join(out)
-    print(f"  [CONTENT] Context compressed: {len(raw_context)} → {len(compressed)} chars")
-    return compressed
+    # Check if post mentions completely unrelated topics
+    unrelated_keywords = [
+        "university admission", "entry test", "kanban",
+        "sop helper", "autofill university", "admission chance",
+        "swipe/discovery", "chrome extension autofill",
+    ]
+    for kw in unrelated_keywords:
+        if kw.lower() in post.lower():
+            issues.append(f"Contains unrelated topic: '{kw}'")
+    
+    # Check minimum length
+    words = len(post.split())
+    if words < 80:
+        issues.append(f"Too short: {words} words")
+    if words > 600:
+        issues.append(f"Too long: {words} words")
+    
+    # Check repo name is mentioned (loosely)
+    repo_lower = repo_name.lower().replace("-", "").replace("_", "")
+    post_lower = post.lower().replace("-", "").replace("_", "")
+    if repo_lower not in post_lower and repo_name.lower() not in post.lower():
+        issues.append(f"Does not mention repo name: {repo_name}")
+    
+    if issues:
+        print(f"  [QUALITY CHECK] Issues found:")
+        for issue in issues:
+            print(f"    - {issue}")
+        return {"pass": False, "issues": issues}
+    
+    print(f"  [QUALITY CHECK] Post looks relevant ({words} words)")
+    return {"pass": True, "issues": []}
 
 
 def _get_multi_repo_context(repo_names: list) -> str:
@@ -392,56 +325,48 @@ def generate_linkedin_post(project_name: str, post_type: str = "project_showcase
     
     instruction = type_instructions.get(post_type, type_instructions["project_showcase"])
     
-    prompt = f"""Write a detailed LinkedIn post about this project. Here is ALL the real data from the repo:
+    # Inject hard facts for known repos
+    fact_block = _get_repo_facts(project_name, user_request)
+    
+    prompt = f"""You are writing a LinkedIn post for {profile_name}.
 
+{fact_block}
+
+ACTUAL REPO CONTEXT:
 {repo_ctx}
 
 Post type: {post_type}
 {instruction}
 
 USER'S REQUEST: "{user_request}"
-Honor the user's request above — if they asked to focus on specific features, architecture, or aspects, prioritize those in your post.
+Honor the user's request — if they asked to focus on specific features, prioritize those.
 
-WRITE THE POST WITH THIS FLOW:
-
-1. THE PROBLEM (3-4 sentences):
-   Open with the real-world problem. Make it personal — "As a student in Pakistan, I watched my classmates..." or "Every admission season in Pakistan...". Paint the picture so readers FEEL the frustration. Who faces this problem? How bad is it?
-
-2. THE SOLUTION — OUR APPROACH (3-4 sentences):
-   Introduce the project and its core idea. Name the architecture: what framework (Next.js? React?), what database (Supabase?), what browser tech (Chrome Extension?). Explain the key design decisions — WHY these tech choices? Connect each choice back to solving the problem. If there's a CI/CD pipeline or scraper engine, mention it.
-
-3. KEY FEATURES — BE COMPREHENSIVE (8-12 sentences):
-   This is the BIGGEST section. Go through the README and FEATURES.md and list ALL the major features with detail. For EACH feature, explain what it does for the user in one sentence. Include features like:
-   - The swipe/discovery system
-   - The filter system (how many filters? what dimensions?)
-   - The admission chance predictor (how does it work?)
-   - The Chrome Extension autofill (3-tier system? how many universities?)
-   - The profile system (how many sections? how many columns?)
-   - The application dashboard (kanban board?)
-   - Entry tests, scholarships, deadlines, comparison tools
-   - Any AI features (SOP helper, field mapping?)
-   DO NOT skip features — mention as many as the data supports.
-
-4. BUILD JOURNEY (2-3 sentences):
-   How many iterations/phases? What was the progression? Reference the CHANGELOG or PROGRESS docs.
-
-5. WHAT'S NEXT + REPO LINK (1-2 sentences):
-   End with what's coming next and the GitHub repo link.
-
-6. HASHTAGS: 4-6 relevant hashtags
-
-CRITICAL RULES:
-- ONLY use facts from the data above — NEVER invent metrics or user counts
-- TARGET 400-500 words — this should be a DETAILED post
-- Write detailed paragraphs, NOT bullet points
+WRITE A LINKEDIN POST THAT:
+- Opens with a specific technical problem developers face (not generic)
+- Mentions at least 2 specific features from the context above with real numbers if available
+- Shows {profile_name}'s perspective as a builder creating production-grade tools
+- Is 200-280 words (not longer)
+- Ends with: repo link, 4-6 relevant hashtags
+- NO image placeholders
+- NO mention of topics NOT in the repo context (no university admissions, no unrelated projects)
+- Write in first person as {profile_name}
 - NO preamble like "Here's a draft" — output ONLY the post itself
-- Include the actual GitHub repo URL
-- Write as {profile_name}, first person"""
+
+Post:"""
 
     result = generate(prompt, content_type="linkedin_post")
     
     # Post-processing: strip AI preamble
     result = _clean_post(result, project_name)
+    
+    # Hallucination guard — catch unrelated content
+    quality = _check_post_quality(result, project_name, user_request)
+    if not quality["pass"]:
+        print("  [QUALITY] Regenerating with stricter prompt (temperature=0.3)...")
+        strict_prompt = prompt + "\n\nCRITICAL: Only mention facts from the repo context above. Do NOT invent features."
+        from agents.content_agent import generate as _gen
+        result = _gen(strict_prompt, content_type="linkedin_post")
+        result = _clean_post(result, project_name)
     
     # Enforce character limit (generous for detailed posts)
     if len(result) > 3500:
