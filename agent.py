@@ -276,16 +276,21 @@ def _handle_content(user_input: str, task: str) -> str | dict:
             "post it", "go live",
         ]
         if any(t in user_input.lower() for t in upload_triggers):
-            print(f"\n  [UPLOAD] Upload requested — launching LinkedIn poster")
+            print(f"\n  [UPLOAD] Upload requested — posting via extension")
             try:
-                from tools.linkedin_poster import LinkedInPoster
-                up_result = LinkedInPoster().post(content=result, source_task=user_input)
-                if up_result["status"] == "posted":
-                    print(f"  LIVE ON LINKEDIN — posted at {up_result['posted_at']}")
-                elif up_result["status"] == "cancelled":
-                    print(f"  [UPLOAD] Cancelled: {up_result['reason']}")
+                from tools.linkedin_extension_poster import LinkedInExtensionPoster
+                up_result = LinkedInExtensionPoster().post(
+                    content=result, source_task=user_input
+                )
+                status = up_result.get("status", "unknown")
+                if status == "posted":
+                    print(f"  LIVE ON LINKEDIN — posted at {up_result.get('posted_at','')}")
+                elif status in ("cancelled", "editing", "timeout"):
+                    print(f"  [UPLOAD] {up_result.get('reason','')}")
+                elif status in ("clipboard_ready", "pasted"):
+                    print(f"  [UPLOAD] {up_result.get('reason','')} — paste Ctrl+V into LinkedIn")
                 else:
-                    print(f"  [UPLOAD] Failed: {up_result['reason']}")
+                    print(f"  [UPLOAD] {up_result.get('reason', 'Unknown error')}")
             except Exception as _ue:
                 print(f"  [UPLOAD] Error: {_ue}")
 

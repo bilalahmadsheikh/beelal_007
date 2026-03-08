@@ -179,12 +179,12 @@ class TaskCoordinator:
     # ── LinkedIn upload step ──────────────────────────
 
     def _post_linkedin(self, task: Task) -> dict:
-        """Upload generated content to LinkedIn via LinkedInPoster."""
+        """Post to LinkedIn via the Chrome extension in the user's existing tab."""
         if not task.generated_content:
             return {"status": "failed", "reason": "No content to upload"}
         try:
-            from tools.linkedin_poster import LinkedInPoster
-            return LinkedInPoster().post(
+            from tools.linkedin_extension_poster import LinkedInExtensionPoster
+            return LinkedInExtensionPoster().post(
                 content=task.generated_content,
                 source_task=task.user_input,
             )

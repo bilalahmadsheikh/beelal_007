@@ -146,13 +146,11 @@ class AgentWorker(QThread):
             # Extract the RESULT section if present
             if "RESULT:" in output:
                 result_part = output.split("RESULT:")[-1].strip()
-                # Also grab any useful prefix info
-                prefix_lines = []
-                for line in output.split("\n"):
-                    if "Routing" in line or "TIMING" in line or "STEP" in line:
-                        prefix_lines.append(line.strip())
-                if prefix_lines:
-                    self.message_ready.emit("\n".join(prefix_lines), "system")
+                # Emit TIMING lines as a compact system message
+                timing_lines = [l.strip() for l in output.split("\n")
+                                if "TIMING" in l or "STEP" in l]
+                if timing_lines:
+                    self.message_ready.emit(" | ".join(timing_lines), "system")
                 self.message_ready.emit(result_part.split("─" * 10)[0].strip(), "agent")
             elif output.strip():
                 self.message_ready.emit(output.strip()[:2000], "agent")
@@ -501,6 +499,7 @@ class AgentOverlay(QMainWindow):
     # Thread-safe signals — emitted from any thread, delivered on main thread
     permission_signal = pyqtSignal(dict)    # → _handle_permission_request
     progress_signal   = pyqtSignal(str, int)  # stage_text, percent → _update_progress
+    log_signal        = pyqtSignal(str, str)  # (text, msg_type) → _on_message  (live status from worker threads)
 
     def __init__(self):
         super().__init__()
@@ -509,6 +508,7 @@ class AgentOverlay(QMainWindow):
         global _overlay_instance
         _overlay_instance = self
         self._permission_decisions = {}  # task_id -> decision string
+        self._last_progress_stage  = ""  # track last stage to suppress duplicate messages
 
         self.setWindowFlags(
             Qt.WindowStaysOnTopHint |
@@ -536,6 +536,7 @@ class AgentOverlay(QMainWindow):
         self.worker.permission_needed.connect(self._on_permission)
         self.permission_signal.connect(self._handle_permission_request)
         self.progress_signal.connect(self._update_progress)
+        self.log_signal.connect(self._on_message)
 
         # Screen annotation layer
         self.annotation = ScreenAnnotation()
@@ -957,7 +958,12 @@ class AgentOverlay(QMainWindow):
             self.stage_label.show()
             self.progress_bar.setValue(max(0, min(100, percent)))
             self.progress_bar.show()
+            # Echo each unique stage into the conversation so the user sees live progress
+            if stage != self._last_progress_stage:
+                self._last_progress_stage = stage
+                self._add_message(f"{stage}", "system")
         else:
+            self._last_progress_stage = ""
             self.stage_label.hide()
             self.progress_bar.hide()
 

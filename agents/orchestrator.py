@@ -36,24 +36,23 @@ def route_command(user_input: str) -> dict:
     Returns:
         dict with keys: agent, model, mode, needs_screen
     """
-    # Few-shot prompt: forces the model to COMPLETE the JSON pattern
+    # One-shot prompt — no \n\n so stop sequences don't fire mid-prompt
     routing_prompt = (
-        'Return ONLY this JSON, no other text:\n'
-        '{"agent":"content","model":"gemma3:4b",'
-        '"mode":"local","needs_screen":false}\n\n'
+        'Return JSON only, no text:\n'
+        '{"agent":"content","model":"gemma3:4b","mode":"local","needs_screen":false}\n'
         f'Task: {user_input}\n'
         'JSON:'
     )
-    
+
     raw = safe_run(
         model=_get_routing_model(),
         prompt=routing_prompt,
         required_gb=0.5,
         system="",
         options={
-            "temperature": 0.1,
+            "temperature": 0.0,
             "num_predict": 80,
-            "stop": ["\n\n", "```"],
+            "stop": ["\n\n", "```", "\n#"],
         },
     )
     

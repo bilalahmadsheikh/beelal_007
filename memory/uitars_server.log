@@ -751,3 +751,31 @@ srv  update_slots: all slots are idle
 2026-03-02 01:09:28,745 [INFO] [UITARSServer] Started 2b on port 8081 (8.6s)
 2026-03-02 01:09:39,175 [INFO] [UITARSServer] Stopping server...
 2026-03-02 01:09:39,671 [INFO] [UITARSServer] Stopped
+2026-03-08 13:55:23,959 [INFO] [PermissionGate] Allow All active for 1 minutes
+2026-03-08 13:55:23,960 [INFO] [PermissionGate] Allow All revoked
+2026-03-08 13:55:23,960 [INFO] [PermissionGate] Added 'scroll' to skip list
+2026-03-08 13:55:23,960 [INFO] [PermissionGate] Removed 'scroll' from skip list
+2026-03-08 13:55:23,967 [INFO] [COPILOT] Drafted 647-char prompt for task: write cover letter
+2026-03-08 13:55:23,971 [INFO] [COPILOT] Drafted 587-char prompt for task: write proposal
+2026-03-08 13:55:23,973 [INFO] [COPILOT] Drafted 256-char prompt for task: write linkedin post
+2026-03-08 13:56:14,689 [INFO] [PermissionGate] Allow All active for 1 minutes
+2026-03-08 13:56:14,689 [INFO] [PermissionGate] Allow All revoked
+2026-03-08 13:56:14,689 [INFO] [PermissionGate] Added 'scroll' to skip list
+2026-03-08 13:56:14,689 [INFO] [PermissionGate] Removed 'scroll' from skip list
+2026-03-08 13:56:14,696 [INFO] [COPILOT] Drafted 647-char prompt for task: write cover letter
+2026-03-08 13:56:14,699 [INFO] [COPILOT] Drafted 587-char prompt for task: write proposal
+2026-03-08 13:56:14,702 [INFO] [COPILOT] Drafted 256-char prompt for task: write linkedin post
+2026-03-08 14:20:49,918 [INFO] [PermissionGate] Allow All active for 1 minutes
+2026-03-08 14:20:49,918 [INFO] [PermissionGate] Allow All revoked
+2026-03-08 14:20:49,918 [INFO] [PermissionGate] Added 'scroll' to skip list
+2026-03-08 14:20:49,918 [INFO] [PermissionGate] Removed 'scroll' from skip list
+2026-03-08 14:20:49,926 [INFO] [COPILOT] Drafted 647-char prompt for task: write cover letter
+2026-03-08 14:20:49,929 [INFO] [COPILOT] Drafted 587-char prompt for task: write proposal
+2026-03-08 14:20:49,931 [INFO] [COPILOT] Drafted 256-char prompt for task: write linkedin post
+2026-03-08 14:27:37,395 [INFO] [PermissionGate] Allow All active for 1 minutes
+2026-03-08 14:27:37,395 [INFO] [PermissionGate] Allow All revoked
+2026-03-08 14:27:37,395 [INFO] [PermissionGate] Added 'scroll' to skip list
+2026-03-08 14:27:37,395 [INFO] [PermissionGate] Removed 'scroll' from skip list
+2026-03-08 14:27:37,403 [INFO] [COPILOT] Drafted 647-char prompt for task: write cover letter
+2026-03-08 14:27:37,406 [INFO] [COPILOT] Drafted 587-char prompt for task: write proposal
+2026-03-08 14:27:37,409 [INFO] [COPILOT] Drafted 256-char prompt for task: write linkedin post

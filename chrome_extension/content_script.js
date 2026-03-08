@@ -1,9 +1,11 @@
 /**
- * content_script.js — BilalAgent v2.0 Chrome Extension Content Script
+ * content_script.js — BilalAgent v3.0 Chrome Extension Content Script
  * Features:
  * 1. Context Snap — "Send to BilalAgent" button on job pages
  * 2. Approval Overlay — bottom-screen overlay with Approve/Cancel
  * 3. MutationObserver — watches Claude.ai / ChatGPT for AI responses
+ * 4. Permission Overlay — permission gate UI
+ * 5. LinkedIn Actor — executes LinkedIn actions
  */
 
 (() => {
@@ -14,6 +16,47 @@
     window.__bilalAgentInjected = true;
 
     const hostname = window.location.hostname;
+
+    // ─── Extension Context Guard ─────────────────────
+    // When extension is reloaded, old content scripts lose their context.
+    // All chrome.runtime calls must go through this wrapper to avoid
+    // "Extension context invalidated" errors.
+    let _contextAlive = true;
+    const _intervalIds = [];  // track all setInterval IDs for cleanup
+
+    function safeSendMessage(msg, callback) {
+        if (!_contextAlive) return;
+        try {
+            chrome.runtime.sendMessage(msg, (response) => {
+                if (chrome.runtime.lastError) {
+                    // Context invalidated — kill all polling
+                    if (chrome.runtime.lastError.message?.includes('context invalidated')) {
+                        _contextAlive = false;
+                        _intervalIds.forEach(id => clearInterval(id));
+                        console.log('[BilalAgent] Extension reloaded — old content script stopping.');
+                        return;
+                    }
+                    // Other errors (SW not ready) — just skip
+                    return;
+                }
+                if (callback) callback(response);
+            });
+        } catch (e) {
+            // chrome.runtime.sendMessage itself threw (context dead)
+            _contextAlive = false;
+            _intervalIds.forEach(id => clearInterval(id));
+            console.log('[BilalAgent] Extension context lost — content script stopped.');
+        }
+    }
+
+    function safeSetInterval(fn, ms) {
+        const id = setInterval(() => {
+            if (!_contextAlive) { clearInterval(id); return; }
+            fn();
+        }, ms);
+        _intervalIds.push(id);
+        return id;
+    }
 
     // ─── Feature 1: Context Snap Button ──────────────
 
@@ -125,7 +168,7 @@
 
             const jobData = extractJobData();
 
-            chrome.runtime.sendMessage(
+            safeSendMessage(
                 { type: 'context_snap', data: jobData },
                 (response) => {
                     if (response?.success) {
@@ -233,7 +276,7 @@
 
         // Button handlers
         document.getElementById('bilal-overlay-approve').addEventListener('click', () => {
-            chrome.runtime.sendMessage({
+            safeSendMessage({
                 type: 'approval_action',
                 data: { task_id: task.task_id, action: 'approve' }
             });
@@ -241,7 +284,7 @@
         });
 
         document.getElementById('bilal-overlay-cancel').addEventListener('click', () => {
-            chrome.runtime.sendMessage({
+            safeSendMessage({
                 type: 'approval_action',
                 data: { task_id: task.task_id, action: 'cancel' }
             });
@@ -292,7 +335,7 @@
                     // Use task_id set by Playwright (hybrid mode) if available
                     const taskId = window.__bilalAgentTaskId || '';
 
-                    chrome.runtime.sendMessage({
+                    safeSendMessage({
                         type: 'ai_response',
                         data: {
                             source: source,
@@ -316,12 +359,157 @@
 
     // ─── Message Listener ───────────────────────────
 
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        if (message.type === 'show_overlay' && message.task) {
-            showOverlay(message.task);
-            sendResponse({ shown: true });
+    try {
+        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+            if (message.type === 'show_overlay' && message.task) {
+                showOverlay(message.task);
+                sendResponse({ shown: true });
+            }
+            if (message.type === 'POST_LINKEDIN_CONTENT' && hostname.includes('linkedin.com')) {
+                console.log('[BilalAgent] POST_LINKEDIN_CONTENT received');
+                handleLinkedInPost(message.content, message.task_id)
+                    .then(result => sendResponse(result))
+                    .catch(err => sendResponse({ error: err.message }));
+                return true;
+            }
+        });
+    } catch (e) { _contextAlive = false; }
+
+    // ─── LinkedIn Post Handler ─────────────────────────
+    async function handleLinkedInPost(postContent, taskId) {
+        // Step 1: Click "Start a post"
+        const shareBox = document.querySelector(
+            '.share-box-feed-entry__top-bar, .share-box-feed-entry__closed-share-box, div[class*="share-box-feed-entry"], .share-box'
+        );
+        let clickTarget = shareBox ? (shareBox.querySelector('button, span, [role="button"]') || shareBox) : null;
+        if (!clickTarget) {
+            for (const el of document.querySelectorAll('button, span, div[role="button"], [tabindex="0"]')) {
+                const t = (el.textContent || '').trim();
+                if ((t === 'Start a post' || (t.length < 30 && t.includes('Start a post'))) && !el.closest('.feed-shared-update-v2, .occludable-update')) {
+                    clickTarget = el; break;
+                }
+            }
         }
-    });
+        if (!clickTarget) return { error: 'Start a post not found on: ' + location.href };
+        clickTarget.click();
+        console.log('[BilalAgent] Clicked Start a Post');
+
+        // Step 2: Wait for Quill editor or contenteditable to appear
+        const editor = await _waitForEditor(12000);
+        if (!editor) return { error: 'LinkedIn editor never appeared after clicking Start a Post' };
+
+        console.log('[BilalAgent] Editor found:', editor.tagName, editor.className?.slice(0, 50), 'ce=' + editor.getAttribute('contenteditable'));
+
+        // Step 3: Click on editor to focus/activate it
+        editor.click();
+        editor.focus();
+        await new Promise(r => setTimeout(r, 500));
+
+        // Step 4: Type the content
+        editor.innerHTML = '';
+        postContent.split('\n').forEach(line => {
+            const p = document.createElement('p');
+            p.textContent = line || '\u200B';
+            editor.appendChild(p);
+        });
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+        editor.dispatchEvent(new Event('change', { bubbles: true }));
+
+        await new Promise(r => setTimeout(r, 500));
+        _showPostBar(postContent, taskId);
+        return { success: true, message: 'content_typed' };
+    }
+
+    function _waitForEditor(timeout) {
+        return new Promise(resolve => {
+            const start = Date.now();
+            const iv = setInterval(() => {
+                let editor = null;
+
+                // 1. Find all potential modals/dialogs (Start a Post ALWAYS opens a modal)
+                const modals = Array.from(document.querySelectorAll('div[role="dialog"], .share-creation-state, .share-box-modal, .artdeco-modal'));
+                // Search from last to first (most recently added / top-most modal)
+                for (let i = modals.length - 1; i >= 0; i--) {
+                    editor = _deepFindEditable(modals[i]);
+                    if (editor) break;
+                }
+
+                // 2. If no modal found, try document.activeElement
+                if (!editor) {
+                    if (document.activeElement &&
+                        document.activeElement.hasAttribute('contenteditable') &&
+                        document.activeElement.getAttribute('contenteditable') !== 'false') {
+                        editor = document.activeElement;
+                    }
+                }
+
+                // 3. Fallback: try finding ANY ql-editor on the page that is visible
+                if (!editor) {
+                    const qls = document.querySelectorAll('.ql-editor[contenteditable], div[role="textbox"][contenteditable="true"]');
+                    for (const ql of qls) {
+                        const r = ql.getBoundingClientRect();
+                        if (r.width > 50 && r.height > 20) { editor = ql; break; }
+                    }
+                }
+
+                if (editor) {
+                    clearInterval(iv);
+                    resolve(editor);
+                } else if (Date.now() - start > timeout) {
+                    clearInterval(iv);
+                    resolve(null);
+                }
+            }, 250);
+        });
+    }
+
+    // Recursively pierces all Shadow DOMs to find a visible editor
+    function _deepFindEditable(root) {
+        if (!root) return null;
+
+        if (root.nodeType === 1) { // Node.ELEMENT_NODE
+            // Check if it's a visible contenteditable
+            if (root.hasAttribute('contenteditable') && root.getAttribute('contenteditable') !== 'false') {
+                const r = root.getBoundingClientRect();
+                if (r.width > 50 && r.height > 20) return root;
+            }
+            // Check if it's a textarea
+            if (root.tagName === 'TEXTAREA') {
+                const r = root.getBoundingClientRect();
+                if (r.width > 50 && r.height > 20) return root;
+            }
+
+            // If it has a shadow root, pierce it
+            if (root.shadowRoot) {
+                const found = _deepFindEditable(root.shadowRoot);
+                if (found) return found;
+            }
+        }
+
+        // Traverse all children (from shadow root if exists, else normal children)
+        const children = root.shadowRoot ? root.shadowRoot.children : root.children;
+        if (children) {
+            for (let i = 0; i < children.length; i++) {
+                const found = _deepFindEditable(children[i]);
+                if (found) return found;
+            }
+        }
+
+        return null;
+    }
+
+    function _showPostBar(content, taskId) {
+        const old = document.getElementById('bilal-agent-post-overlay'); if (old) old.remove();
+        const wc = content.split(/\s+/).filter(Boolean).length;
+        const bar = document.createElement('div');
+        bar.id = 'bilal-agent-post-overlay';
+        bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:2147483647;background:linear-gradient(to top,rgba(10,10,30,.98),rgba(15,23,42,.96));border-top:3px solid #4ECDC4;backdrop-filter:blur(20px);padding:16px 24px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;';
+        bar.innerHTML = '<style>.ba-btn{border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;transition:all .2s;font-family:inherit}.ba-btn:hover{transform:translateY(-1px);filter:brightness(1.1)}</style><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span style="background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;padding:4px 12px;border-radius:12px;font-weight:700;font-size:10px;text-transform:uppercase">⚡ BilalAgent</span><span style="background:#4ECDC4;color:#000;padding:3px 10px;border-radius:12px;font-weight:bold;font-size:11px">POST READY</span><span style="color:#94a3b8;font-size:12px">' + wc + ' words</span><div style="margin-left:auto;display:flex;gap:10px"><button id="ba-post-now" class="ba-btn" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;box-shadow:0 2px 10px rgba(16,185,129,.3)">✓ Post Now</button><button id="ba-edit-first" class="ba-btn" style="background:rgba(59,130,246,.15);color:#60a5fa;border:1px solid rgba(59,130,246,.3)">✏ Edit First</button><button id="ba-cancel" class="ba-btn" style="background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3)">✕ Cancel</button></div></div>';
+        document.body.appendChild(bar);
+        document.getElementById('ba-post-now').onclick = () => { bar.remove(); const pb = document.querySelector('button.share-actions__primary-action') || Array.from(document.querySelectorAll('button')).find(b => (b.textContent || '').trim() === 'Post' && b.closest('div[role="dialog"]')); if (pb) { pb.click(); const bn = document.createElement('div'); bn.style.cssText = 'position:fixed;top:20px;right:20px;z-index:2147483647;background:#10b981;color:#fff;padding:14px 24px;border-radius:12px;font-family:sans-serif;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.3)'; bn.textContent = '✅ Posted to LinkedIn!'; document.body.appendChild(bn); setTimeout(() => bn.remove(), 4000); } };
+        document.getElementById('ba-edit-first').onclick = () => bar.remove();
+        document.getElementById('ba-cancel').onclick = () => { bar.remove(); const cb = document.querySelector('button[aria-label="Dismiss"], button[aria-label="Close"]'); if (cb) cb.click(); };
+    }
 
     // ─── Initialize ──────────────────────────────────
 
@@ -558,6 +746,9 @@
 
     // ─── Feature 5: LinkedIn Task Watcher ────────────
 
+    // bridgeAlive must be declared BEFORE any function that uses it
+    // (let does not hoist like var — temporal dead zone otherwise)
+    let bridgeAlive = true;
     let watchingLinkedIn = false;
 
     async function pollActiveTasks() {
@@ -575,9 +766,9 @@
                     watchLinkedInPage(task.task_id);
                 }
             }
-        } catch (e) {}
+        } catch (e) { }
     }
-    setInterval(pollActiveTasks, 2000);
+    safeSetInterval(pollActiveTasks, 2000);
 
     function watchLinkedInPage(taskId) {
         const reportState = (state) => {
@@ -590,7 +781,7 @@
                     url: window.location.href,
                     ts: Date.now()
                 })
-            }).catch(() => {});
+            }).catch(() => { });
             console.log(`[BilalAgent] LinkedIn state: ${state}`);
         };
 
@@ -620,19 +811,294 @@
     }
 
     // Bridge liveness check (gates pollActiveTasks + pollPermissions)
+    // NOTE: bridgeAlive is declared above (before pollActiveTasks) to avoid
+    // temporal dead zone with `let`.
     async function checkBridge() {
         try {
             const r = await fetch(`${BRIDGE_URL}/status`,
-                                  { signal: AbortSignal.timeout(2000) });
+                { signal: AbortSignal.timeout(2000) });
             bridgeAlive = r.ok;
         } catch (e) {
             bridgeAlive = false;
         }
     }
-    // bridgeAlive flag already declared above; set initial value
-    let bridgeAlive = true;
-    setInterval(checkBridge, 5000);
+    safeSetInterval(checkBridge, 5000);
     checkBridge();
 
-    console.log('[BilalAgent] Content script loaded (Permission Gate + LinkedIn Watcher)');
+    // ═══════════════════════════════════════════════════════
+    // LINKEDIN ACTOR — executes actions in the current tab
+    // Content-script-driven polling (page process is always alive,
+    // unlike MV3 service workers which sleep after ~30s idle).
+    // ═══════════════════════════════════════════════════════
+
+    let executingLinkedInAction = false;
+
+    // Poll background every second for pending LinkedIn actions.
+    // Only runs on LinkedIn pages. Background does the bridge fetch (no CSP).
+    if (hostname.includes('linkedin.com')) {
+        console.log('[BilalAgent] LinkedIn tab detected — starting action poll');
+        safeSetInterval(() => {
+            if (executingLinkedInAction) return;
+            safeSendMessage({ type: 'POLL_LINKEDIN_ACTION' }, (response) => {
+                if (!response || !response.action) return;
+                const action = response.action;
+                executingLinkedInAction = true;
+                console.log('[BilalAgent] Received LinkedIn action:', action.type, action.action_id);
+                executeLinkedInAction(action)
+                    .catch(e => reportLinkedInResult(action.action_id, 'failed', e.message))
+                    .finally(() => { executingLinkedInAction = false; });
+            });
+        }, 1000);
+    }
+
+    // Results go via background SW (LinkedIn CSP blocks direct fetch to localhost)
+    function reportLinkedInResult(actionId, status, message) {
+        safeSendMessage({
+            type: 'LINKEDIN_RESULT',
+            action_id: actionId,
+            status: status,
+            result_message: message
+        });
+    }
+
+    async function executeLinkedInAction(action) {
+        const { action_id, type, content } = action;
+
+        if (type === 'open_composer') {
+            const opened = await openLinkedInComposer();
+            if (opened) {
+                await reportLinkedInResult(action_id, 'done', 'composer_opened');
+            } else {
+                await reportLinkedInResult(action_id, 'failed',
+                    'Could not find Start a post button');
+            }
+        } else if (type === 'type_content') {
+            const typed = await typeIntoComposer(content);
+            if (typed) {
+                showPostPreviewOverlay(action_id, content);
+                // result reported later by user clicking Upload/Edit/Cancel
+            } else {
+                await reportLinkedInResult(action_id, 'failed',
+                    'Could not find composer editor');
+            }
+        } else if (type === 'click_post') {
+            const posted = await clickPostButton();
+            if (posted) {
+                await reportLinkedInResult(action_id, 'done', 'post_clicked');
+            } else {
+                await reportLinkedInResult(action_id, 'failed', 'Could not find Post button');
+            }
+        }
+    }
+
+    async function openLinkedInComposer() {
+        // Already open?
+        const existingEditor = document.querySelector(
+            'div.ql-editor[contenteditable="true"], ' +
+            'div[data-placeholder="What do you want to talk about?"]'
+        );
+        if (existingEditor) {
+            existingEditor.click();
+            console.log('[BilalAgent] Composer already open');
+            return true;
+        }
+
+        // Try click triggers
+        const selectors = [
+            'button.share-box-feed-entry__trigger',
+            '[data-control-name="share.sharebox_prompt_open"]',
+            '.share-box-feed-entry__closed-share-box button',
+            'div.share-box-feed-entry__trigger',
+            // Current LinkedIn 2024/2025 selectors
+            'button[aria-label="Start a post"]',
+            'div[aria-label="Start a post"]',
+            '[data-view-name="share-box-feed-entry"] button',
+        ];
+        for (const sel of selectors) {
+            const el = document.querySelector(sel);
+            if (el) {
+                el.click();
+                await sleep(1800);
+                const editor = document.querySelector(
+                    'div.ql-editor[contenteditable="true"], ' +
+                    'div[data-placeholder="What do you want to talk about?"]'
+                );
+                if (editor) {
+                    console.log('[BilalAgent] Composer opened via', sel);
+                    return true;
+                }
+            }
+        }
+
+        // Last resort: find any button whose text mentions "post"
+        for (const btn of document.querySelectorAll('button, div[role="button"]')) {
+            const text = btn.textContent.trim().toLowerCase();
+            if (text === 'start a post' || text.includes('start a post')) {
+                btn.click();
+                await sleep(1800);
+                const editor = document.querySelector('div.ql-editor[contenteditable="true"]');
+                if (editor) { console.log('[BilalAgent] Composer opened via text match'); return true; }
+            }
+        }
+        return false;
+    }
+
+    async function typeIntoComposer(content) {
+        // Wait up to 3s for editor to appear after composer opened
+        let editor = null;
+        for (let attempt = 0; attempt < 6; attempt++) {
+            editor = document.querySelector(
+                'div.ql-editor[contenteditable="true"], ' +
+                'div[data-placeholder="What do you want to talk about?"][contenteditable="true"]'
+            );
+            if (editor) break;
+            await sleep(500);
+        }
+        // Broader fallback
+        if (!editor) {
+            editor = document.querySelector(
+                'div.share-creation-state__text-editor div[contenteditable="true"], ' +
+                'div[contenteditable="true"]'
+            );
+        }
+        if (!editor) return false;
+
+        editor.focus();
+        editor.click();
+        await sleep(400);
+
+        // Clear existing content
+        document.execCommand('selectAll', false, null);
+        document.execCommand('delete', false, null);
+        await sleep(200);
+
+        // Insert content line by line
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            document.execCommand('insertText', false, lines[i]);
+            if (i < lines.length - 1) {
+                editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
+                await sleep(30);
+            }
+        }
+        await sleep(500);
+        console.log('[BilalAgent] Content typed into composer:', content.length, 'chars');
+        return true;
+    }
+
+    async function clickPostButton() {
+        const selectors = [
+            'button.share-actions__primary-action',
+            'button[data-control-name="share.post"]',
+            '.share-creation-state__post-btn',
+        ];
+        for (const sel of selectors) {
+            const btn = document.querySelector(sel);
+            if (btn && !btn.disabled) { btn.click(); await sleep(2000); return true; }
+        }
+        // XPath fallback
+        for (const btn of document.querySelectorAll('button')) {
+            if (btn.textContent.trim() === 'Post' && !btn.disabled) {
+                btn.click(); await sleep(2000); return true;
+            }
+        }
+        return false;
+    }
+
+    function showPostPreviewOverlay(actionId, content) {
+        const existing = document.getElementById('bilal-post-preview');
+        if (existing) existing.remove();
+
+        const wordCount = content.split(/\s+/).filter(Boolean).length;
+        const overlay = document.createElement('div');
+        overlay.id = 'bilal-post-preview';
+        overlay.style.cssText = `
+            position:fixed;bottom:0;left:0;right:0;z-index:2147483647;
+            background:linear-gradient(to top, rgba(10,10,30,0.98), rgba(15,23,42,0.96));
+            border-top:3px solid #4ECDC4;backdrop-filter:blur(20px);
+            padding:16px 24px 14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+            animation:bilalSlideUp 0.3s ease;
+        `;
+        overlay.innerHTML = `
+            <style>
+                @keyframes bilalSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+                .bilal-preview-btn { border:none; padding:10px 22px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; transition:all 0.2s; font-family:inherit; }
+                .bilal-preview-btn:hover { transform:translateY(-1px); filter:brightness(1.1); }
+            </style>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+                <span style="background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;padding:4px 12px;border-radius:12px;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:0.5px">
+                    ⚡ Generated by BilalAgent
+                </span>
+                <span style="background:#4ECDC4;color:#000;padding:3px 10px;border-radius:12px;font-weight:bold;font-size:11px">POST READY</span>
+                <span style="color:#94a3b8;font-size:12px">${wordCount} words typed into LinkedIn</span>
+                <span style="color:#64748b;font-size:11px;margin-left:auto">Review post above, then decide:</span>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <button id="bilal-upload-btn" class="bilal-preview-btn" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;font-size:14px;box-shadow:0 2px 10px rgba(16,185,129,0.3)">
+                    ✓ Upload Now
+                </button>
+                <button id="bilal-edit-btn" class="bilal-preview-btn" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3)">
+                    ✏ Edit First
+                </button>
+                <button id="bilal-cancel-btn" class="bilal-preview-btn" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3)">
+                    ✕ Cancel
+                </button>
+                <span style="color:#475569;font-size:11px;align-self:center;margin-left:8px">(Esc to cancel)</span>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        document.getElementById('bilal-upload-btn').onclick = async () => {
+            overlay.remove();
+            const posted = await clickPostButton();
+            if (posted) {
+                showBanner('✓ Posted to LinkedIn!', '#10b981');
+                reportLinkedInResult(actionId, 'done', 'posted');
+                safeSendMessage({
+                    type: 'PAGE_STATE',
+                    data: { task_id: actionId, state: 'post_confirmed', url: window.location.href, ts: Date.now() }
+                });
+            } else {
+                await reportLinkedInResult(actionId, 'failed', 'Post button not found');
+            }
+        };
+
+        document.getElementById('bilal-edit-btn').onclick = () => {
+            overlay.remove();
+            reportLinkedInResult(actionId, 'done', 'user_editing');
+            showBanner('✏ Edit the post above, then click Post', '#3b82f6');
+        };
+
+        document.getElementById('bilal-cancel-btn').onclick = async () => {
+            overlay.remove();
+            const closeBtn = document.querySelector('button[aria-label="Dismiss"],button.share-creation-state__close-btn');
+            if (closeBtn) closeBtn.click();
+            await reportLinkedInResult(actionId, 'done', 'cancelled');
+        };
+
+        const onEsc = (e) => {
+            if (e.key === 'Escape') {
+                overlay.remove();
+                reportLinkedInResult(actionId, 'done', 'cancelled');
+                document.removeEventListener('keydown', onEsc);
+            }
+        };
+        document.addEventListener('keydown', onEsc);
+    }
+
+    function showBanner(text, color) {
+        const b = document.createElement('div');
+        b.style.cssText = `position:fixed;top:20px;right:20px;background:${color};color:#fff;padding:12px 20px;border-radius:8px;font-family:Arial;font-size:14px;font-weight:bold;z-index:2147483647;box-shadow:0 4px 12px rgba(0,0,0,0.3)`;
+        b.textContent = text;
+        document.body.appendChild(b);
+        setTimeout(() => b.remove(), 4000);
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    // ═══════════════════════════════════════════════════════
+    // END LINKEDIN ACTOR
+    // ═══════════════════════════════════════════════════════
+
+    console.log('[BilalAgent] Content script loaded (Permission Gate + LinkedIn Watcher + Actor)');
 })();

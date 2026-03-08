@@ -80,6 +80,17 @@ class LinkedInPoster:
         except Exception:
             pass
 
+    def _overlay_log(self, text: str, msg_type: str = "system"):
+        """Push a plain text message directly to the overlay conversation."""
+        print(f"  [LI] {text}")
+        try:
+            from ui.desktop_overlay import get_overlay_instance
+            overlay = get_overlay_instance()
+            if overlay is not None:
+                overlay.log_signal.emit(text, msg_type)
+        except Exception:
+            pass
+
     def _close_chrome_with_permission(self) -> bool:
         """Ask permission before killing Chrome (needed to unlock the profile)."""
         decision = self.gate.request({
@@ -94,10 +105,31 @@ class LinkedInPoster:
         })
         if decision not in ("allow", "allow_all"):
             return False
-        print("  [CHROME] Closing Chrome to free profile lock...")
+        self._overlay_log("Killing Chrome processes…")
         os.system("taskkill /F /IM chrome.exe /T >nul 2>&1")
-        time.sleep(2.5)
+        # Wait for processes to die, then remove Chrome's lock files so
+        # launch_persistent_context can acquire the profile without hanging.
+        time.sleep(3)
+        self._remove_chrome_locks()
         return True
+
+    def _remove_chrome_locks(self):
+        """Delete Chrome singleton lock files so Playwright can open the profile."""
+        try:
+            from tools.chrome_profile import get_profile_path
+            profile_path = get_profile_path()
+        except Exception:
+            return
+        for lock_name in ("SingletonLock", "SingletonCookie", "SingletonSocket",
+                          "lockfile", ".org.chromium.Chromium"):
+            lock_path = os.path.join(profile_path, lock_name)
+            try:
+                if os.path.exists(lock_path):
+                    os.remove(lock_path)
+                    print(f"  [CHROME] Removed lock: {lock_name}")
+                    self._overlay_log(f"Removed lock file: {lock_name}")
+            except Exception as e:
+                print(f"  [CHROME] Could not remove {lock_name}: {e}")
 
     def _launch_with_existing_profile(self) -> bool:
         """
@@ -112,6 +144,7 @@ class LinkedInPoster:
         chrome_exe   = get_chrome_exe()
         ext_path     = get_extension_path()
 
+        self._overlay_log(f"Launching Chrome with profile: {os.path.basename(profile_path)}")
         print(f"  [CHROME] Profile : {profile_path}")
         print(f"  [CHROME] Exe     : {chrome_exe}")
 
@@ -133,6 +166,7 @@ class LinkedInPoster:
             ],
             ignore_default_args = ["--enable-automation"],
             slow_mo             = 40,
+            timeout             = 60000,  # 60s timeout — fail fast instead of hanging
         )
 
         pages     = self.context.pages
@@ -193,30 +227,34 @@ class LinkedInPoster:
                     "reason": "Permission denied: Chrome profile launch"}
 
         # ── OPEN BROWSER WITH REAL PROFILE ────────────
+        self._overlay_log("Closing Chrome and relaunching with your profile…")
         self._progress("🌐 Opening Chrome with your profile", 52)
         try:
             self._launch_with_existing_profile()
+            self._overlay_log("Chrome launched — loading LinkedIn feed…")
             self.page.goto(LINKEDIN_FEED,
                            wait_until="domcontentloaded", timeout=30000)
             time.sleep(2)
         except Exception as e:
+            self._overlay_log(f"Chrome launch failed: {e}", "error")
             return {"status": "failed", "reason": f"Chrome launch failed: {e}"}
 
         # ── CHECK LOGIN ───────────────────────────────
         if "login" in self.page.url or "checkpoint" in self.page.url:
             self._progress("🔑 Waiting for LinkedIn login...", 54)
-            print("  [LINKEDIN] Not logged in — waiting up to 60s for manual login")
+            self._overlay_log("Not logged in — please log in to LinkedIn (60s timeout)")
             for _ in range(60):
                 time.sleep(1)
                 if "feed" in self.page.url:
-                    print("  [LINKEDIN] Logged in")
+                    self._overlay_log("Logged in to LinkedIn")
                     break
             else:
                 self.page.close()
+                self._overlay_log("Login timeout — aborting", "error")
                 return {"status": "failed", "reason": "Not logged in to LinkedIn"}
 
         self._progress("🔗 LinkedIn feed loaded", 58)
-        print("  [LINKEDIN] Feed loaded")
+        self._overlay_log("LinkedIn feed loaded")
 
         # ── CLICK START A POST ────────────────────────
         start_selectors = [
@@ -230,12 +268,13 @@ class LinkedInPoster:
             try:
                 self.page.locator(sel).first.click(timeout=6000)
                 clicked = True
-                print("  [LINKEDIN] Clicked 'Start a post'")
+                self._overlay_log("Clicked 'Start a post' — composer opening…")
                 break
             except Exception:
                 continue
         if not clicked:
             self.page.close()
+            self._overlay_log("Could not find 'Start a post' button", "error")
             return {"status": "failed", "reason": "Could not find 'Start a post' button"}
 
         time.sleep(1.5)
@@ -257,6 +296,7 @@ class LinkedInPoster:
                     "reason": f"Permission denied: type post ({decision})"}
 
         # ── TYPE THE POST ─────────────────────────────
+        self._overlay_log(f"Typing post into composer ({len(content.split())} words)…")
         editor_selectors = [
             "div.ql-editor",
             "div[data-placeholder='What do you want to talk about?']",
@@ -271,12 +311,13 @@ class LinkedInPoster:
                 time.sleep(0.4)
                 self.page.keyboard.type(content, delay=15)
                 typed = True
-                print("  [LINKEDIN] Post typed into composer")
+                self._overlay_log("Post typed into composer")
                 break
             except Exception:
                 continue
         if not typed:
             self.page.close()
+            self._overlay_log("Could not find post editor", "error")
             return {"status": "failed", "reason": "Could not find post editor"}
 
         self._progress("✍ Post typed into composer", 72)
@@ -307,6 +348,7 @@ class LinkedInPoster:
             }
 
         self._progress("📤 Submitting post to LinkedIn", 85)
+        self._overlay_log("Clicking Post button…")
         # ── CLICK POST BUTTON ─────────────────────────
         post_selectors = [
             "button.share-actions__primary-action",
@@ -319,13 +361,13 @@ class LinkedInPoster:
             try:
                 self.page.locator(sel).first.click(timeout=6000)
                 posted = True
-                print("  [LINKEDIN] Post button clicked")
+                self._overlay_log("Post button clicked — publishing…")
                 break
             except Exception:
                 continue
 
         if not posted:
-            print("  [LINKEDIN] Could not auto-click Post — please click within 20s")
+            self._overlay_log("Could not auto-click Post — please click manually within 20s")
             time.sleep(20)
 
         time.sleep(3)
@@ -334,6 +376,7 @@ class LinkedInPoster:
         confirmed = self._wait_for_extension_state("post_confirmed", timeout=15)
         posted_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self._progress("✅ Post published on LinkedIn", 100)
+        self._overlay_log(f"✅ Posted to LinkedIn at {posted_at}", "agent")
 
         # ── LOG SUCCESS ───────────────────────────────
         try:

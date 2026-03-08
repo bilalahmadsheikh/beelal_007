@@ -456,6 +456,71 @@ async def get_page_state(task_id: str):
     return page_states.get(task_id, {"state": "unknown"})
 
 
+# ─── LinkedIn Extension Actions ─────────────────────
+
+import time as _time2
+
+# Pending LinkedIn actions: action_id -> {type, content, status, result, ...}
+linkedin_actions: dict = {}
+
+
+class LinkedInActionBody(BaseModel):
+    action_id: str
+    type: str            # "open_composer" | "type_content" | "click_post"
+    content: str = ""
+
+
+class LinkedInResultBody(BaseModel):
+    action_id: str
+    status: str          # "done" | "failed"
+    message: str = ""
+
+
+@app.post("/linkedin/action")
+async def queue_linkedin_action(body: LinkedInActionBody):
+    """Agent posts a LinkedIn action; extension polls and picks it up."""
+    linkedin_actions[body.action_id] = {
+        **body.model_dump(),
+        "status": "pending",
+        "result": None,
+        "queued_at": _time2.time(),
+    }
+    print(f"[LINKEDIN] Queued: {body.type} ({body.action_id})")
+    return {"status": "queued", "action_id": body.action_id}
+
+
+@app.get("/linkedin/action/pending")
+async def get_pending_linkedin_action():
+    """Extension polls this every second and picks up the next pending action."""
+    for action_id, action in linkedin_actions.items():
+        if action["status"] == "pending":
+            # Mark as in-progress so it isn't handed out twice
+            linkedin_actions[action_id]["status"] = "in_progress"
+            return action
+    return {}
+
+
+@app.post("/linkedin/action/result")
+async def report_linkedin_result(body: LinkedInResultBody):
+    """Extension reports back: done or failed."""
+    if body.action_id in linkedin_actions:
+        linkedin_actions[body.action_id].update({
+            "status": body.status,
+            "result": body.message,
+            "completed_at": _time2.time(),
+        })
+    print(f"[LINKEDIN] Result: {body.action_id} → {body.status} ({body.message})")
+    return {"status": "ok"}
+
+
+@app.get("/linkedin/action/result/{action_id}")
+async def get_linkedin_result(action_id: str):
+    """Agent polls this waiting for extension to finish the action."""
+    if action_id not in linkedin_actions:
+        return {"status": "not_found"}
+    return linkedin_actions[action_id]
+
+
 # ─── Phase 12: Route Endpoint ───────────────────────
 
 class RouteRequest(BaseModel):
@@ -477,3 +542,200 @@ async def route_task(data: RouteRequest):
         return {"agent": "nlp", "model": "gemma3:1b", "mode": "local",
                 "needs_screen": False, "error": str(e)}
 
+
+# ═══════════════════════════════════════════════════════
+# Agent Communication — SSE + Content Push + Prompts
+# Enables desktop agent ↔ Chrome Extension real-time flow
+# ═══════════════════════════════════════════════════════
+
+import asyncio
+from fastapi.responses import StreamingResponse
+
+# In-memory stores
+agent_content_store: dict = {}   # task_id -> {content, content_type, status, ...}
+agent_prompts: list = []          # [{prompt, source, ts, consumed}, ...]
+sse_queues: list = []             # list of asyncio.Queue for active SSE connections
+
+
+class AgentContentReady(BaseModel):
+    content: str
+    content_type: str = "linkedin_post"
+    task_id: str = ""
+    metadata: dict = {}
+
+
+class AgentContentDecision(BaseModel):
+    task_id: str
+    decision: str  # "approved" | "rejected" | "editing"
+
+
+class AgentPromptBody(BaseModel):
+    prompt: str
+    source: str = "extension"
+
+
+class AgentMessageBody(BaseModel):
+    message: str
+    message_type: str = "agent_message"
+
+
+# ─── SSE Stream ─────────────────────────────────────
+
+def _push_sse_event(event_type: str, data: dict):
+    """Push an SSE event to all connected popup clients."""
+    payload = json.dumps(data)
+    dead = []
+    for i, q in enumerate(sse_queues):
+        try:
+            q.put_nowait(f"event: {event_type}\ndata: {payload}\n\n")
+        except Exception:
+            dead.append(i)
+    for i in reversed(dead):
+        sse_queues.pop(i)
+
+
+async def _sse_generator():
+    """Async generator yielding SSE events to a single connected client."""
+    queue = asyncio.Queue()
+    sse_queues.append(queue)
+    try:
+        # Initial heartbeat
+        yield "event: status_update\ndata: {\"agent_status\": \"connected\"}\n\n"
+        while True:
+            try:
+                msg = await asyncio.wait_for(queue.get(), timeout=30)
+                yield msg
+            except asyncio.TimeoutError:
+                # Send keepalive comment
+                yield ": keepalive\n\n"
+    except asyncio.CancelledError:
+        pass
+    finally:
+        if queue in sse_queues:
+            sse_queues.remove(queue)
+
+
+@app.get("/agent/stream")
+async def agent_stream():
+    """SSE endpoint — extension popup subscribes for real-time agent events."""
+    return StreamingResponse(
+        _sse_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+
+# ─── Content Push (Agent → Extension) ────────────────
+
+@app.post("/agent/content/ready")
+async def agent_content_ready(data: AgentContentReady):
+    """Desktop agent pushes generated content. Extension popup gets SSE event."""
+    task_id = data.task_id or str(uuid.uuid4())[:8]
+    word_count = len(data.content.split())
+
+    agent_content_store[task_id] = {
+        "task_id": task_id,
+        "content": data.content,
+        "content_type": data.content_type,
+        "word_count": word_count,
+        "status": "pending_review",
+        "metadata": data.metadata,
+        "created_at": datetime.now().isoformat(),
+    }
+
+    # Push SSE event to popup
+    _push_sse_event("content_ready", {
+        "task_id": task_id,
+        "content": data.content,
+        "content_type": data.content_type,
+        "word_count": word_count,
+    })
+
+    print(f"[AGENT] Content ready: {task_id} ({data.content_type}, {word_count} words)")
+    return {"task_id": task_id, "status": "pending_review", "word_count": word_count}
+
+
+@app.get("/agent/content/latest")
+async def agent_content_latest():
+    """Fallback polling — return the latest pending content."""
+    for task_id in reversed(list(agent_content_store.keys())):
+        entry = agent_content_store[task_id]
+        if entry.get("status") == "pending_review":
+            return entry
+    return {"status": "none"}
+
+
+@app.post("/agent/content/decision")
+async def agent_content_decision(data: AgentContentDecision):
+    """Extension reports user decision on content."""
+    if data.task_id in agent_content_store:
+        agent_content_store[data.task_id]["status"] = data.decision
+        agent_content_store[data.task_id]["decided_at"] = datetime.now().isoformat()
+
+    # Push SSE event
+    _push_sse_event("action_result", {
+        "task_id": data.task_id,
+        "status": "done",
+        "message": f"Content {data.decision}",
+    })
+
+    print(f"[AGENT] Content decision: {data.task_id} → {data.decision}")
+    return {"task_id": data.task_id, "decision": data.decision, "status": "ok"}
+
+
+@app.get("/agent/content/status/{task_id}")
+async def agent_content_status(task_id: str):
+    """Desktop agent polls for user decision on content."""
+    if task_id not in agent_content_store:
+        return {"status": "not_found"}
+    return agent_content_store[task_id]
+
+
+# ─── Prompts (Extension → Agent) ─────────────────────
+
+@app.post("/agent/prompt")
+async def agent_prompt(data: AgentPromptBody):
+    """Extension sends a user prompt to the desktop agent."""
+    prompt_entry = {
+        "prompt": data.prompt,
+        "source": data.source,
+        "ts": datetime.now().isoformat(),
+        "consumed": False,
+    }
+    agent_prompts.append(prompt_entry)
+
+    # Push SSE notification
+    _push_sse_event("agent_message", {
+        "message": f"Prompt received: {data.prompt[:100]}",
+        "type": "prompt_ack",
+    })
+
+    print(f"[AGENT] Prompt from {data.source}: {data.prompt[:80]}")
+    return {"status": "queued", "prompt": data.prompt[:100]}
+
+
+@app.get("/agent/prompt/pending")
+async def agent_prompt_pending():
+    """Desktop agent polls for user prompts from extension."""
+    pending = [p for p in agent_prompts if not p.get("consumed")]
+    # Mark as consumed
+    for p in pending:
+        p["consumed"] = True
+    return pending
+
+
+# ─── Agent Messages (Agent → Extension) ──────────────
+
+@app.post("/agent/message")
+async def agent_message(data: AgentMessageBody):
+    """Desktop agent pushes a message to the extension popup."""
+    _push_sse_event(data.message_type, {
+        "message": data.message,
+        "ts": datetime.now().isoformat(),
+    })
+    print(f"[AGENT] Message: {data.message[:80]}")
+    return {"status": "sent"}
